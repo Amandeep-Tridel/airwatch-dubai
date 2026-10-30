@@ -34,12 +34,13 @@
     unit: localStorage.getItem("aw-unit") || "ppm",
     gas: "h2s",
     hours: 24,
-    live: null,          // /api/live payload
-    hist: null,          // /api/history payload (24 h, always)
+    live: null,
+    hist: null,
     lastTs: null,
     plot: null,
     fetchFailed: false,
-    standalone: location.hostname.endsWith("github.io") || location.protocol === "file:",
+    // 100% standalone in-browser engine by default (no Python server required)
+    standalone: new URLSearchParams(location.search).get("mode") !== "server",
   };
 
   // ------------------------------------------------------------------ utils
@@ -51,7 +52,11 @@
   const fmtTime = (unix, opts = { hour: "2-digit", minute: "2-digit" }) =>
     unix ? new Intl.DateTimeFormat("en-GB", { timeZone: TZ, ...opts }).format(new Date(unix * 1000)) : "—";
 
-  function conv(ppm) { return ppm == null ? null : state.unit === "ppb" ? ppm * 1000 : ppm; }
+  function conv(ppm) {
+    if (ppm == null || !isFinite(ppm)) return null;
+    const clamped = Math.max(0, ppm);
+    return state.unit === "ppb" ? clamped * 1000 : clamped;
+  }
   function fmtVal(gas, ppm) {
     const v = conv(ppm);
     if (v == null || !isFinite(v)) return "—";
@@ -152,9 +157,9 @@
     const end = H.t[H.t.length - 1], start = end - hours * 3600;
     const idx = H.t.map((t, i) => (t >= start ? i : -1)).filter((i) => i >= 0);
     if (idx.length < 2) return "";
-    const vs = idx.map((i) => H[gas].v[i]);
-    let lo = Math.min(0, ...vs), hi = Math.max(...vs);
-    if (hi - lo < 1e-6) { lo -= 0.005; hi += 0.005; }
+    const vs = idx.map((i) => Math.max(0, H[gas].v[i]));
+    let lo = 0, hi = Math.max(...vs);
+    if (hi - lo < 1e-6) { hi = 0.01; }
     const W = 300, Hh = 44, pad = 4;
     const x = (k) => (k / (idx.length - 1)) * W;
     const y = (v) => Hh - pad - ((v - lo) / (hi - lo)) * (Hh - 2 * pad);

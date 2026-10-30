@@ -183,7 +183,30 @@ button:focus-visible, .gas-card:focus-visible, summary:focus-visible, a:focus-vi
 .gc-value { font-size: 40px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .gc-value.as-text { font-size: 28px; font-weight: 700; color: var(--text-2); }
 .gc-unit { font-size: 15px; font-weight: 600; color: var(--text-3); }
+.gc-mode-badge {
+  margin-left: 4px; padding: 2px 7px; border-radius: 6px;
+  font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+  background: color-mix(in srgb, var(--gas-color) 14%, transparent);
+  color: var(--gas-color);
+}
 .gc-sub { font-size: 13px; color: var(--text-2); min-height: 20px; }
+.gc-avgs {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
+  margin: 2px 0;
+}
+.gc-avg-tile {
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+  border-radius: 8px; padding: 6px 4px; text-align: center; cursor: pointer;
+  display: grid; gap: 1px; font: inherit; transition: border-color .15s, background .15s;
+}
+.gc-avg-tile:hover { border-color: var(--gas-color); }
+.gc-avg-tile.is-active {
+  background: color-mix(in srgb, var(--gas-color) 13%, var(--surface));
+  border-color: var(--gas-color);
+}
+.gc-avg-tile .ak { font-size: 10.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.gc-avg-tile.is-active .ak { color: var(--gas-color); }
+.gc-avg-tile .av { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .gc-spark { width: 100%; height: 44px; display: block; }
 .gc-foot { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); }
 .gc-bar { height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
@@ -193,10 +216,28 @@ button:focus-visible, .gas-card:focus-visible, summary:focus-visible, a:focus-vi
 .chart { width: 100%; min-height: 320px; }
 .chart .u-legend { font-size: 13px; color: var(--text-2); }
 .chart .u-legend .u-marker { border-radius: 3px; }
-.chart-key { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 8px; font-size: 12.5px; color: var(--text-3); }
-.chart-key span { display: inline-flex; align-items: center; gap: 7px; }
+.chart-key { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 12.5px; color: var(--text-3); }
+.chart-key span, .key-toggle { display: inline-flex; align-items: center; gap: 7px; }
+.key-toggle {
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--text-2);
+  padding: 4px 10px; border-radius: 999px; font: 600 12px var(--font); cursor: pointer;
+}
+.key-toggle[aria-pressed="false"] { opacity: .42; }
 .key-line { width: 18px; height: 3px; border-radius: 2px; background: var(--sel-color, var(--h2s)); display: inline-block; }
-.key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sel-color, var(--h2s)); opacity: .45; display: inline-block; }
+.key-line.avg10 { background: #f59e0b; }
+.key-line.avg20 { background: #ec4899; }
+.key-line.avg30 { background: #6366f1; }
+.key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sel-color, var(--h2s)); opacity: .55; display: inline-block; }
+.rolling-table th.is-active, .rolling-table td.is-active {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  font-weight: 700;
+}
+.rolling-table th[data-avg] { cursor: pointer; }
+.rolling-table th[data-avg]:hover { color: var(--text); }
+.rolling-table tbody tr { cursor: pointer; }
+.rolling-table tbody tr:hover { background: var(--surface-2); }
+.rolling-gas { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+.rolling-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .key-band { width: 18px; height: 11px; border-radius: 3px; background: var(--muted-bg); border-top: 2px dashed var(--muted); display: inline-block; }
 .chart-empty { display: grid; place-items: center; height: 300px; color: var(--text-3); }
 .chart-readout { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; margin-top: 6px; padding: 8px 12px; background: var(--surface-2); border-radius: 9px; font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; min-height: 36px; }

@@ -6,7 +6,7 @@
   <title>AirWatch Dubai — Live Air Quality</title>
   <meta name="description" content="Live hydrogen sulfide, ammonia and VOC readings from the AQMS station in Dubai." />
   <link rel="stylesheet" href="./vendor/uPlot.min.css" />
-  <link rel="stylesheet" href="./app.css?v=11" />
+  <link rel="stylesheet" href="./app.css?v=12" />
   <script>
     // Apply saved/system theme before paint to avoid a flash
     (function () {
@@ -33,6 +33,12 @@
       <span id="livePill" class="live-pill is-wait" role="status" aria-live="polite">
         <span class="dot"></span><span id="liveText">Connecting…</span>
       </span>
+      <div class="seg" role="group" aria-label="Averaging window" id="avgTabs">
+        <button type="button" data-avg="live" aria-pressed="true" title="Instantaneous Kalman-smoothed reading">Live</button>
+        <button type="button" data-avg="10" aria-pressed="false" title="10-minute rolling average">10m Avg</button>
+        <button type="button" data-avg="20" aria-pressed="false" title="20-minute rolling average">20m Avg</button>
+        <button type="button" data-avg="30" aria-pressed="false" title="30-minute rolling average">30m Avg</button>
+      </div>
       <div class="seg" role="group" aria-label="Units">
         <button type="button" data-unit="ppm" aria-pressed="true">ppm</button>
         <button type="button" data-unit="ppb" aria-pressed="false">ppb</button>
@@ -64,12 +70,31 @@
       <article class="gas-card" data-gas="voc" tabindex="0"></article>
     </section>
 
+    <!-- 2b. 10m / 20m / 30m Rolling Averages Overview -->
+    <section class="panel" id="rollingPanel" aria-label="Rolling average summary">
+      <div class="panel-head">
+        <div>
+          <h2>Rolling Averages (10 min · 20 min · 30 min)</h2>
+          <p class="muted small">Time-windowed averages across all monitored gases. Click any window to switch the dashboard view.</p>
+        </div>
+        <div class="seg" role="group" aria-label="Rolling window quick switch" id="avgTabsPanel">
+          <button type="button" data-avg="live" aria-pressed="true">Live</button>
+          <button type="button" data-avg="10" aria-pressed="false">10 min</button>
+          <button type="button" data-avg="20" aria-pressed="false">20 min</button>
+          <button type="button" data-avg="30" aria-pressed="false">30 min</button>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="grid-table rolling-table" id="rollingTable"></table>
+      </div>
+    </section>
+
     <!-- 3. Trend chart -->
     <section class="panel">
       <div class="panel-head">
         <div>
-          <h2>Trend</h2>
-          <p class="muted small">Tap a gas card or choose below. Hover the chart for exact values.</p>
+          <h2>Trend &amp; Rolling Curves</h2>
+          <p class="muted small">Tap a gas card or choose below. Hover the chart to compare Live vs 10m / 20m / 30m rolling averages.</p>
         </div>
         <div class="panel-controls">
           <div class="seg" role="group" aria-label="Gas" id="gasTabs">
@@ -86,9 +111,12 @@
       </div>
       <div id="chart" class="chart" role="img" aria-label="Concentration over time"></div>
       <div id="chartReadout" class="chart-readout" aria-live="off"></div>
-      <div class="chart-key">
-        <span><i class="key-line"></i>Measured (smoothed)</span>
-        <span><i class="key-dot"></i>Individual samples</span>
+      <div class="chart-key" id="chartKey">
+        <button type="button" class="key-toggle" data-sidx="1" aria-pressed="true"><i class="key-line"></i>Live (smoothed)</button>
+        <button type="button" class="key-toggle" data-sidx="2" aria-pressed="true"><i class="key-line avg10"></i>10 min avg</button>
+        <button type="button" class="key-toggle" data-sidx="3" aria-pressed="true"><i class="key-line avg20"></i>20 min avg</button>
+        <button type="button" class="key-toggle" data-sidx="4" aria-pressed="true"><i class="key-line avg30"></i>30 min avg</button>
+        <button type="button" class="key-toggle" data-sidx="5" aria-pressed="true"><i class="key-dot"></i>Individual samples</button>
       </div>
     </section>
 
@@ -163,7 +191,7 @@
   <div id="tip" class="tip" role="tooltip" hidden></div>
 
   <script src="./vendor/uPlot.iife.min.js"></script>
-  <script src="./standalone_engine.js?v=11"></script>
-  <script src="./app.js?v=11"></script>
+  <script src="./standalone_engine.js?v=12"></script>
+  <script src="./app.js?v=12"></script>
 </body>
 </html>

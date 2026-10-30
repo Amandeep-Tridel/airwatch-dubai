@@ -262,6 +262,7 @@
       };
       this.filteredHist = { h2s: [], nh3: [], voc: [] };
       this.signalMv = { h2s: [], nh3: [], voc: [] };
+      this.rollingBuf = []; // [{ ts, h2s, nh3, voc }] up to 30 min (1800 s)
       this.batteryHist = [];
       this.powerOnUnix = null;
       this.lastSampleUnix = null;
@@ -341,6 +342,7 @@
             this.filteredHist[g] = [];
             this.signalMv[g] = [];
           }
+          this.rollingBuf = [];
           this.h2sT90 = null;
         }
       }
@@ -409,15 +411,35 @@
       }
       if (spikeFrame) this.samplesFiltered++;
 
+      // Timestamp-windowed rolling averages: 10 min (600 s), 20 min (1200 s), 30 min (1800 s)
+      this.rollingBuf.push({ ts: tsUnix, h2s: filt.h2s, nh3: filt.nh3, voc: filt.voc });
+      while (this.rollingBuf.length && this.rollingBuf[0].ts < tsUnix - 1800) {
+        this.rollingBuf.shift();
+      }
+      const winMean = (sec, gas) => {
+        const cut = tsUnix - sec;
+        let s = 0, c = 0;
+        for (let i = this.rollingBuf.length - 1; i >= 0; i--) {
+          if (this.rollingBuf[i].ts < cut) break;
+          s += this.rollingBuf[i][gas];
+          c++;
+        }
+        return c > 0 ? s / c : filt[gas];
+      };
+
       const mw = { h2s: 34.081, nh3: 17.031, voc: 56.106 };
       const report = {};
       for (const g of GASES) {
         const filtSigma = Math.sqrt(Math.max(this.kalman[g].p, 0));
         const sRel = CONFIG[g].sens_rel_uncertainty;
         const unc = Math.sqrt(zeroUncPpm[g] ** 2 + filtSigma ** 2 + (sRel * filt[g]) ** 2);
+        const r10 = winMean(600, g), r20 = winMean(1200, g), r30 = winMean(1800, g);
         report[g] = {
           value_ppm: Number(filt[g].toFixed(5)),
           sample_ppm: Number(sample[g].toFixed(5)),
+          avg_10m_ppm: Number(r10.toFixed(5)),
+          avg_20m_ppm: Number(r20.toFixed(5)),
+          avg_30m_ppm: Number(r30.toFixed(5)),
           uncertainty_ppm: Number(unc.toFixed(5)),
           lod_ppm: 0,
           noise_ppm: Number(noisePpm[g].toFixed(5)),
@@ -618,6 +640,9 @@
         out[g] = {
           v: rows.map((r) => r.report[g].value_ppm),
           s: rows.map((r) => r.report[g].sample_ppm),
+          r10: rows.map((r) => r.report[g].avg_10m_ppm),
+          r20: rows.map((r) => r.report[g].avg_20m_ppm),
+          r30: rows.map((r) => r.report[g].avg_30m_ppm),
           lod: rows.map(() => 0),
           st: rows.map((r) => STATUS_CODE[r.report[g].status] ?? 2),
           al: rows.map((r) => ALARM_CODE[r.alarms[g]] ?? 0),
@@ -654,7 +679,10 @@
       const header = [
         "ts", "firebase_key", "station_id",
         "a0_nh3_mv", "a1_h2s_we_mv", "a2_h2s_ae_mv", "a3_voc_mv",
-        "h2s_ppm", "nh3_ppm", "voc_ppm", "battery_v", "temp_c", "rh_pct", "raw_string",
+        "h2s_ppm", "h2s_10m_ppm", "h2s_20m_ppm", "h2s_30m_ppm",
+        "nh3_ppm", "nh3_10m_ppm", "nh3_20m_ppm", "nh3_30m_ppm",
+        "voc_ppm", "voc_10m_ppm", "voc_20m_ppm", "voc_30m_ppm",
+        "battery_v", "temp_c", "rh_pct", "raw_string",
       ];
       const escCsv = (v) => {
         const s = String(v ?? "");
@@ -665,7 +693,9 @@
         lines.push([
           r.ts, r.firebase_key, r.station_id,
           r.raw.nh3_we_mv, r.raw.h2s_we_mv, r.raw.h2s_ae_mv, r.raw.voc_mv,
-          r.report.h2s.value_ppm, r.report.nh3.value_ppm, r.report.voc.value_ppm,
+          r.report.h2s.value_ppm, r.report.h2s.avg_10m_ppm, r.report.h2s.avg_20m_ppm, r.report.h2s.avg_30m_ppm,
+          r.report.nh3.value_ppm, r.report.nh3.avg_10m_ppm, r.report.nh3.avg_20m_ppm, r.report.nh3.avg_30m_ppm,
+          r.report.voc.value_ppm, r.report.voc.avg_10m_ppm, r.report.voc.avg_20m_ppm, r.report.voc.avg_30m_ppm,
           r.hardware.battery_v ?? "", r.raw.head_t_c, r.raw.rh_pct, r.raw_string,
         ].map(escCsv).join(","));
       }

@@ -373,6 +373,9 @@ async def api_history(hours: float = Query(24.0, ge=0.25, le=48.0)):
         out[g] = {
             "v": [r["report"][g]["value_ppm"] for r in rows],
             "s": [r["report"][g]["sample_ppm"] for r in rows],
+            "r10": [r["report"][g].get("avg_10m_ppm", r["report"][g]["value_ppm"]) for r in rows],
+            "r20": [r["report"][g].get("avg_20m_ppm", r["report"][g]["value_ppm"]) for r in rows],
+            "r30": [r["report"][g].get("avg_30m_ppm", r["report"][g]["value_ppm"]) for r in rows],
             "lod": [r["report"][g]["lod_ppm"] for r in rows],
             "st": [STATUS_CODE.get(r["report"][g]["status"], 1) for r in rows],
             "al": [ALARM_CODE.get(r["alarms"][g], 0) for r in rows],

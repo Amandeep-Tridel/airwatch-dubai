@@ -280,6 +280,7 @@ class AQMSAlgorithmEngine:
                     st.hampel[g].clear()
                     st.filtered_hist[g].clear()
                     st.signal_mv[g].clear()
+                st.rolling.clear()
                 st.h2s_t90 = None
         st.last_sample_unix = ts_unix
         uptime_min = (ts_unix - st.power_on_unix) / 60.0
@@ -371,16 +372,27 @@ class AQMSAlgorithmEngine:
         }
         status = {g: self._status(warm[g], filt[g], lod[g]) for g in GASES}
 
-        # --- rolling 10-min mean on SAMPLE timestamps --------------------------
+        # --- rolling 10m / 20m / 30m means on SAMPLE timestamps ----------------
         st.rolling.append((ts_unix, filt["h2s"], filt["nh3"], filt["voc"]))
-        while st.rolling and st.rolling[0][0] < ts_unix - self.rolling_window_s:
+        while st.rolling and st.rolling[0][0] < ts_unix - 1800.0:
             st.rolling.popleft()
-        nroll = len(st.rolling)
-        roll = {
-            "h2s": sum(r[1] for r in st.rolling) / nroll,
-            "nh3": sum(r[2] for r in st.rolling) / nroll,
-            "voc": sum(r[3] for r in st.rolling) / nroll,
-        }
+
+        def _win_mean(sec: float) -> Dict[str, float]:
+            cut = ts_unix - sec
+            rows_w = [r for r in st.rolling if r[0] >= cut]
+            if not rows_w:
+                return dict(filt)
+            nw = len(rows_w)
+            return {
+                "h2s": sum(r[1] for r in rows_w) / nw,
+                "nh3": sum(r[2] for r in rows_w) / nw,
+                "voc": sum(r[3] for r in rows_w) / nw,
+            }
+
+        roll10 = _win_mean(600.0)
+        roll20 = _win_mean(1200.0)
+        roll30 = _win_mean(1800.0)
+        roll = roll10
 
         # --- QC flags: reference-module flags + engine flags -------------------
         extra: Dict[str, List[str]] = {g: [] for g in GASES}
@@ -431,6 +443,9 @@ class AQMSAlgorithmEngine:
             g: {
                 "value_ppm": round(filt[g], 5),
                 "sample_ppm": round(sample[g], 5),
+                "avg_10m_ppm": round(roll10[g], 5),
+                "avg_20m_ppm": round(roll20[g], 5),
+                "avg_30m_ppm": round(roll30[g], 5),
                 "uncertainty_ppm": round(unc[g], 5),
                 "lod_ppm": round(lod[g], 5),
                 "noise_ppm": round(noise_ppm[g], 5),

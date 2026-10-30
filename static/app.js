@@ -32,8 +32,10 @@
   // ------------------------------------------------------------------ state
   const state = {
     unit: localStorage.getItem("aw-unit") || "ppm",
+    avg: localStorage.getItem("aw-avg") || "live",  // "live" | "10" | "20" | "30"
     gas: "h2s",
     hours: 24,
+    seriesOn: [true, true, true, true, true],       // Live, 10m, 20m, 30m, Samples
     live: null,
     hist: null,
     lastTs: null,
@@ -62,6 +64,42 @@
     if (v == null || !isFinite(v)) return "—";
     return v.toFixed(GAS[gas].dec[state.unit]);
   }
+  function timeRollingMean(tsArr, valArr, winSec) {
+    const n = tsArr.length, out = new Array(n);
+    let left = 0, sum = 0, cnt = 0;
+    for (let i = 0; i < n; i++) {
+      const v = valArr[i];
+      if (v != null && isFinite(v)) { sum += v; cnt++; }
+      const cut = tsArr[i] - winSec;
+      while (left < i && tsArr[left] < cut) {
+        const lv = valArr[left];
+        if (lv != null && isFinite(lv)) { sum -= lv; cnt--; }
+        left++;
+      }
+      out[i] = cnt > 0 ? sum / cnt : null;
+    }
+    return out;
+  }
+  function ensureRollingArrays(H) {
+    if (!H || !H.t?.length) return H;
+    for (const g of ORDER) {
+      if (!H[g]) continue;
+      if (!H[g].r10) H[g].r10 = timeRollingMean(H.t, H[g].v, 600);
+      if (!H[g].r20) H[g].r20 = timeRollingMean(H.t, H[g].v, 1200);
+      if (!H[g].r30) H[g].r30 = timeRollingMean(H.t, H[g].v, 1800);
+    }
+    return H;
+  }
+  function getGasAvgs(gas, g) {
+    const H = state.hist, last = H?.t?.length ? H.t.length - 1 : -1;
+    return {
+      live: g?.value_ppm ?? (last >= 0 ? H[gas].v[last] : null),
+      "10": g?.avg_10m_ppm ?? (last >= 0 ? H[gas].r10?.[last] : g?.value_ppm ?? null),
+      "20": g?.avg_20m_ppm ?? (last >= 0 ? H[gas].r20?.[last] : g?.value_ppm ?? null),
+      "30": g?.avg_30m_ppm ?? (last >= 0 ? H[gas].r30?.[last] : g?.value_ppm ?? null),
+    };
+  }
+  const AVG_LABELS = { live: "Live", "10": "10m avg", "20": "20m avg", "30": "30m avg" };
   function ago(sec) {
     if (sec == null) return "—";
     if (sec < 60) return `${Math.max(0, Math.round(sec))} s ago`;
@@ -157,7 +195,9 @@
     const end = H.t[H.t.length - 1], start = end - hours * 3600;
     const idx = H.t.map((t, i) => (t >= start ? i : -1)).filter((i) => i >= 0);
     if (idx.length < 2) return "";
-    const vs = idx.map((i) => Math.max(0, H[gas].v[i]));
+    const srcKey = state.avg === "10" ? "r10" : state.avg === "20" ? "r20" : state.avg === "30" ? "r30" : "v";
+    const arr = H[gas][srcKey] || H[gas].v;
+    const vs = idx.map((i) => Math.max(0, arr[i] ?? 0));
     let lo = 0, hi = Math.max(...vs);
     if (hi - lo < 1e-6) { hi = 0.01; }
     const W = 300, Hh = 44, pad = 4;
@@ -178,22 +218,31 @@
     $$(".gas-card").forEach((card) => {
       const gas = card.dataset.gas, meta = GAS[gas];
       const g = L?.gases?.[gas];
-      const s = gasState(gas, g);
+      const avgs = getGasAvgs(gas, g);
+      const activePpm = avgs[state.avg] ?? g?.value_ppm;
+      const s = gasState(gas, g ? { ...g, value_ppm: activePpm } : g);
       card.style.setProperty("--gas-color", css(meta.color));
       card.classList.toggle("is-selected", gas === state.gas);
 
-      let valueHTML, sub;
+      let valueHTML, sub, avgsHTML = "";
       if (!g) { valueHTML = `<span class="gc-value as-text">—</span>`; sub = ""; }
       else if (g.status === "WARMUP") {
         valueHTML = `<span class="gc-value as-text">Warming up</span>`;
         sub = "Sensor is stabilising after power-on";
       } else {
-        valueHTML = `<span class="gc-value">${fmtVal(gas, g.value_ppm)}</span><span class="gc-unit">${state.unit}</span>`;
+        const badge = state.avg === "live" ? "" : `<span class="gc-mode-badge">${AVG_LABELS[state.avg]}</span>`;
+        valueHTML = `<span class="gc-value">${fmtVal(gas, activePpm)}</span><span class="gc-unit">${state.unit}</span>${badge}`;
         sub = `Sample ${fmtVal(gas, g.sample_ppm)} ${state.unit} · ± ${fmtVal(gas, g.noise_ppm)} ${state.unit} noise`;
+        avgsHTML = `<div class="gc-avgs" role="group" aria-label="${meta.name} rolling averages">` +
+          [["live", "Live"], ["10", "10m avg"], ["20", "20m avg"], ["30", "30m avg"]].map(([k, lbl]) =>
+            `<button type="button" class="gc-avg-tile ${state.avg === k ? "is-active" : ""}" data-avg-pick="${k}">
+              <span class="ak">${lbl}</span><span class="av">${fmtVal(gas, avgs[k])}</span>
+            </button>`
+          ).join("") + `</div>`;
       }
 
       const warn = th[`${gas}_ppm`]?.warning;
-      const pct = warn && g ? Math.max(0, Math.min(100, (Math.max(0, g.value_ppm) / warn) * 100)) : 0;
+      const pct = warn && g ? Math.max(0, Math.min(100, (Math.max(0, activePpm ?? 0) / warn) * 100)) : 0;
       const pctText = !g || g.status === "WARMUP" ? "—" : `${pct < 1 && pct > 0 ? "<1" : pct.toFixed(0)}%`;
       const trend = g?.trend && g.status !== "WARMUP"
         ? { RISING: "↗ rising", FALLING: "↘ falling", STABLE: "→ steady" }[g.trend] : "";
@@ -208,11 +257,51 @@
         </div>
         <div class="gc-reading">${valueHTML}</div>
         <div class="gc-sub">${sub} ${trend ? `<span class="muted">· ${trend}</span>` : ""}</div>
+        ${avgsHTML}
         ${sparkSVG(gas)}
         <div class="gc-bar" title="Share of the warning threshold"><span style="width:${pct}%"></span></div>
         <div class="gc-foot"><span>Warning threshold: ${warn != null ? `${fmtVal(gas, warn)} ${state.unit}` : "—"}</span><span>${pctText ? `${pctText} of threshold` : ""}</span></div>`;
       card.setAttribute("aria-label", `${meta.name}: ${s.label}`);
     });
+  }
+
+  function renderRollingTable() {
+    const tbl = $("#rollingTable");
+    const L = state.live?.latest, H = state.hist, th = state.live?.thresholds || {};
+    if (!tbl || !L) return;
+    const end = H?.t?.length ? H.t[H.t.length - 1] : 0;
+    const cut30 = end - 1800;
+
+    const headCols = [
+      ["live", "Live (Smoothed)"],
+      ["10", "10 min Avg"],
+      ["20", "20 min Avg"],
+      ["30", "30 min Avg"],
+    ];
+    tbl.innerHTML =
+      `<thead><tr>
+        <th>Gas</th>` +
+      headCols.map(([k, lbl]) => `<th data-avg="${k}" class="${state.avg === k ? "is-active" : ""}">${lbl} (${state.unit})</th>`).join("") +
+      `<th>30 min Peak (${state.unit})</th><th>Warning Limit</th></tr></thead><tbody>` +
+      ORDER.map((gas) => {
+        const g = L.gases?.[gas], avgs = getGasAvgs(gas, g), meta = GAS[gas];
+        let peak30 = avgs.live;
+        if (H?.t?.length) {
+          for (let i = H.t.length - 1; i >= 0 && H.t[i] >= cut30; i--) {
+            if (H[gas].v[i] > (peak30 ?? -Infinity)) peak30 = H[gas].v[i];
+          }
+        }
+        const warn = th[`${gas}_ppm`]?.warning;
+        return `<tr data-gas-row="${gas}">
+          <td><span class="rolling-gas"><i class="rolling-dot" style="background:${css(meta.color)}"></i>${meta.name} (${meta.formula})</span></td>
+          <td class="${state.avg === "live" ? "is-active" : ""}">${fmtVal(gas, avgs.live)}</td>
+          <td class="${state.avg === "10" ? "is-active" : ""}">${fmtVal(gas, avgs["10"])}</td>
+          <td class="${state.avg === "20" ? "is-active" : ""}">${fmtVal(gas, avgs["20"])}</td>
+          <td class="${state.avg === "30" ? "is-active" : ""}">${fmtVal(gas, avgs["30"])}</td>
+          <td>${fmtVal(gas, peak30)}</td>
+          <td>${warn != null ? `${fmtVal(gas, warn)} ${state.unit}` : "—"}</td>
+        </tr>`;
+      }).join("") + `</tbody>`;
   }
 
   function renderConditions() {
@@ -245,11 +334,12 @@
   function chartData() {
     const H = state.hist;
     if (!H || !H.t.length) return null;
+    ensureRollingArrays(H);
     const end = H.t[H.t.length - 1], start = end - state.hours * 3600;
-    const i0 = H.t.findIndex((t) => t >= start);
-    const sl = (a) => a.slice(i0).map(conv);
+    const i0 = Math.max(0, H.t.findIndex((t) => t >= start));
+    const sl = (a) => (a || []).slice(i0).map(conv);
     const g = H[state.gas];
-    return [H.t.slice(i0), sl(g.v), sl(g.s)];
+    return [H.t.slice(i0), sl(g.v), sl(g.r10), sl(g.r20), sl(g.r30), sl(g.s)];
   }
 
   function buildPlot() {
@@ -264,6 +354,10 @@
     const axis = { stroke: css("--text-3"), grid: { stroke: css("--line"), width: 1 }, ticks: { stroke: css("--line") }, font: `12px ${css("--font") || "system-ui"}` };
     const dec = GAS[state.gas].dec[state.unit];
     const span = data[0][data[0].length - 1] - data[0][0];
+    const wLive = state.avg === "live" ? 2.6 : 1.5;
+    const w10 = state.avg === "10" ? 2.8 : 1.7;
+    const w20 = state.avg === "20" ? 2.8 : 1.7;
+    const w30 = state.avg === "30" ? 2.8 : 1.7;
 
     const opts = {
       width: el.clientWidth || 800,
@@ -285,8 +379,11 @@
       ],
       series: [
         {},
-        { label: "Measured", stroke: col, width: 2.2, points: { show: false } },
-        { label: "Sample", stroke: col, width: 0, paths: () => null, points: { show: true, size: 3, stroke: col + "66", fill: col + "55", width: 0 } },
+        { label: "Live", show: state.seriesOn[0], stroke: col, width: wLive, points: { show: false } },
+        { label: "10m Avg", show: state.seriesOn[1], stroke: "#f59e0b", width: w10, points: { show: false } },
+        { label: "20m Avg", show: state.seriesOn[2], stroke: "#ec4899", width: w20, points: { show: false } },
+        { label: "30m Avg", show: state.seriesOn[3], stroke: "#6366f1", width: w30, points: { show: false } },
+        { label: "Sample", show: state.seriesOn[4], stroke: col, width: 0, paths: () => null, points: { show: true, size: 3, stroke: col + "55", fill: col + "44", width: 0 } },
       ],
       hooks: { setCursor: [(u) => renderReadout(u.cursor.idx)] },
     };
@@ -301,11 +398,14 @@
     const n = p.data[0].length;
     const i = idx == null ? n - 1 : idx;
     if (i < 0 || i >= n) return;
-    const [t, v, s] = p.data.map((a) => a[i]);
+    const [t, v, r10, r20, r30, s] = p.data.map((a) => a[i]);
     const dec = GAS[state.gas].dec[state.unit] + 1;
     const f = (x) => (x == null ? "—" : `${x.toFixed(dec)} ${state.unit}`);
     out.innerHTML = `<strong>${fmtTime(t, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} GST</strong>
-      <span>Measured <b>${f(v)}</b></span>
+      <span>Live <b>${f(v)}</b></span>
+      <span>10m avg <b>${f(r10)}</b></span>
+      <span>20m avg <b>${f(r20)}</b></span>
+      <span>30m avg <b>${f(r30)}</b></span>
       <span>Sample ${f(s)}</span>
       <span class="muted">${idx == null ? "latest" : "hovered"}</span>`;
   }
@@ -434,9 +534,10 @@
 
   async function refreshHistory() {
     try {
-      state.hist = state.standalone && window.AQMSStandalone
+      const rawH = state.standalone && window.AQMSStandalone
         ? window.AQMSStandalone.getHistory(24)
         : await getJSON("/api/history?hours=24");
+      state.hist = ensureRollingArrays(rawH);
       updatePlot();
       renderTimeline();
     } catch (e) { console.warn(e); }
@@ -446,6 +547,7 @@
     renderLivePill();
     renderBanner();
     renderCards();
+    renderRollingTable();
     renderConditions();
     if (rebuildChart) { buildPlot(); renderTimeline(); }
   }
@@ -455,10 +557,27 @@
     state.gas = gas;
     $$("#gasTabs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.gas === gas)));
     renderCards();
+    renderRollingTable();
+    buildPlot();
+  }
+
+  function selectAvg(avg) {
+    if (!["live", "10", "20", "30"].includes(avg)) return;
+    state.avg = avg;
+    localStorage.setItem("aw-avg", avg);
+    $$("#avgTabs button, #avgTabsPanel button").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.avg === avg))
+    );
+    renderCards();
+    renderRollingTable();
     buildPlot();
   }
 
   function wire() {
+    $$("#avgTabs button, #avgTabsPanel button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.avg === state.avg));
+      b.addEventListener("click", () => selectAvg(b.dataset.avg));
+    });
     $$(".seg[aria-label='Units'] button").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.dataset.unit === state.unit));
       b.addEventListener("click", () => {
@@ -476,8 +595,35 @@
       buildPlot();
     }));
     $$(".gas-card").forEach((c) => {
-      c.addEventListener("click", () => selectGas(c.dataset.gas));
+      c.addEventListener("click", (e) => {
+        const pick = e.target.closest("[data-avg-pick]");
+        if (pick) {
+          e.stopPropagation();
+          selectGas(c.dataset.gas);
+          selectAvg(pick.dataset.avgPick);
+          return;
+        }
+        selectGas(c.dataset.gas);
+      });
       c.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectGas(c.dataset.gas); } });
+    });
+    const rTbl = $("#rollingTable");
+    if (rTbl) {
+      rTbl.addEventListener("click", (e) => {
+        const thAvg = e.target.closest("th[data-avg]");
+        if (thAvg) { selectAvg(thAvg.dataset.avg); return; }
+        const row = e.target.closest("tr[data-gas-row]");
+        if (row) selectGas(row.dataset.gasRow);
+      });
+    }
+    $$("#chartKey .key-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const sidx = Number(btn.dataset.sidx);
+        const k = sidx - 1;
+        state.seriesOn[k] = !state.seriesOn[k];
+        btn.setAttribute("aria-pressed", String(state.seriesOn[k]));
+        if (state.plot) state.plot.setSeries(sidx, { show: state.seriesOn[k] });
+      });
     });
     $("#themeBtn").addEventListener("click", () => {
       const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";

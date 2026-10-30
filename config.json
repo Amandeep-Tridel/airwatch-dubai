@@ -1,0 +1,178 @@
+{
+  "server": {
+    "http_port": 8000,
+    "max_history_points": 1440,
+    "log_to_csv": true
+  },
+  "firebase": {
+    "enabled": true,
+    "url": "https://aqms-65300-default-rtdb.firebaseio.com/data.json",
+    "cert_path": "certs/gts_root_r1.pem",
+    "poll_interval_sec": 1.5
+  },
+  "string_format": {
+    "description": "Channel Mapping: A0 = NH3, A1 = H2S OP1 (WE), A2 = H2S OP2 (AE), A3 = VOC",
+    "default_station_id": "aqms-monitor",
+    "always_use_internet_weather": true
+  },
+  "calibration": {
+    "calibration_verified": false,
+    "calibration_note": "PROVISIONAL. Zeros estimated from first night of clean-air data (2026-10-28). Sensitivities are nominal datasheet/guess values. Replace with Alphasense certificate values + carbon-bag zero test, then set calibration_verified=true.",
+    "power_gap_reset_min": 15,
+    "h2s": {
+      "serial": "H2S-B4-DUBAI (A1=OP1 WE, A2=OP2 AE)",
+      "algorithm": 1,
+      "we_e_mv": 589.0,
+      "ae_e_mv": 302.0,
+      "zero_source": "PROVISIONAL: we_e is an EFFECTIVE combined offset (5th percentile of A1 - n_T*(A2-302) after 60 min warm-up), not the ISB label value. Replace WE_e/AE_e with ISB label values when available.",
+      "sens_mv_per_ppb": 0.73,
+      "sens_rel_uncertainty": 0.4,
+      "zero_uncertainty_mv": 12.0,
+      "noise_mv_default": 4.9,
+      "warmup_min": 60,
+      "n_t_table": {
+        "-30": -0.6,
+        "-20": -0.6,
+        "-10": 0.1,
+        "0": 0.8,
+        "10": -0.7,
+        "20": -2.5,
+        "30": -2.5,
+        "40": -2.2,
+        "50": -1.8
+      },
+      "n_t_note": "AAN 803 Table, H2S-B4 algorithm 1 (typical batch). Taken from a secondary copy of the app note - official PDF not retrieved; verify against Alphasense AAN 803-05. Negative n_T = WE and AE zeros move in opposite directions, matching the Dubai data (overnight zero drift 40 mV with n_T=1 vs 24 mV with this table).",
+      "datasheet": {
+        "source": "Alphasense H2S-B4 Technical Specification v1.0 (docs/alphasense/h2s-b4_datasheet.pdf)",
+        "sensitivity_nA_per_ppm": "1450 to 2600 @ 2 ppm",
+        "zero_current_nA_20C": "-250 to 200",
+        "noise_ppb_2sd_ISB": 1,
+        "t90_s": "< 60",
+        "zero_change_nA_minus20C": "+50 to +60",
+        "zero_change_nA_50C": "-120 to -160",
+        "sensitivity_pct_minus20C": "77 to 90",
+        "sensitivity_pct_50C": "100 to 110",
+        "zero_drift_ppb_per_year": "< +/-100",
+        "sensitivity_drift_pct_per_year": "< 20",
+        "linearity_ppb_error": "< +/-4 (0-40 ppm)",
+        "range_ppm": 100,
+        "temp_C": "-30 to 50",
+        "rh_pct": "15 to 90",
+        "cross_sensitivity_pct": {
+          "NO2": "<-10",
+          "Cl2": "<-12",
+          "NO": "<12",
+          "SO2": "<20",
+          "CO": "<3",
+          "H2": "<0.5",
+          "NH3": "<0.1"
+        }
+      },
+      "adc_fsr_v": 2.56,
+      "adc_bits": 16,
+      "adc_bipolar": true
+    },
+    "nh3": {
+      "serial": "NH3-B1-DUBAI (A0)",
+      "we_e_mv": 405.9,
+      "zero_source": "PROVISIONAL: 5th percentile of A0 after 180 min warm-up",
+      "sens_mv_per_ppm": 65.0,
+      "sens_rel_uncertainty": 0.5,
+      "zero_ppm_equivalent": 0.0,
+      "board_bias_mv": 200.0,
+      "xs_h2s_ppm_per_ppm": -2.0,
+      "t90_match_alpha": 0.63,
+      "t90_match_note": "H2S-B4 t90 < 60 s vs NH3-B1 t90 < 150 s (datasheets). Extra lag tau = sqrt(65^2 - 26^2) ~ 60 s; at 60 s sampling alpha = 1 - exp(-1) = 0.63.",
+      "datasheet": {
+        "source": "Alphasense NH3-B1 Technical Specification v1.1 (docs/alphasense/nh3-b1_datasheet.pdf)",
+        "sensitivity_nA_per_ppm": "20 to 60 @ 50 ppm",
+        "zero_ppm_equivalent": "< +/-10 in zero air",
+        "t90_s": "< 150 (t50 ~ 30)",
+        "linearity_ppm_error": "+5 to -5 (0-100 ppm)",
+        "bias_mv": 200,
+        "temperature_dependence": "nd (not determined) for sensitivity and zero",
+        "zero_drift_ppm_per_year": "< 2",
+        "sensitivity_drift_pct_per_year": "< 3",
+        "range_ppm": 100,
+        "temp_C": "-30 to 50",
+        "rh_pct": "15 to 90",
+        "cross_sensitivity_pct": {
+          "H2S": "<-200",
+          "NO2": "<-200",
+          "Cl2": "<-400",
+          "NO": "<-300",
+          "SO2": "<-300",
+          "CO": "<20",
+          "H2": "<15"
+        },
+        "ist_option": "NH3-B1+ has an I2C IST board: memory M24128 (0xA0) with factory zero/sensitivity/cal date at 0x0B00, temperature sensor MAX31875 (0x90, +/-1 C)"
+      },
+      "noise_mv_default": 4.0,
+      "event_threshold_mv": 30.0,
+      "event_note": "Filtered A0 rise above zero; 30 mV is above the 99th percentile (26 mV) of the first clean night.",
+      "warmup_min": 180,
+      "adc_fsr_v": 2.56,
+      "adc_bits": 16,
+      "adc_bipolar": true
+    },
+    "voc": {
+      "serial": "PIDX-A-040-DUBAI (A3)",
+      "v_zero_mv": 95.5,
+      "zero_source": "PROVISIONAL: lowest stable clean-air level observed (2nd percentile, overnight)",
+      "mv_per_ppm": 55.0,
+      "sens_rel_uncertainty": 0.1,
+      "zero_uncertainty_mv": 5.0,
+      "noise_mv_default": 1.2,
+      "high_rh_flag_pct": null,
+      "humidity_note": "Datasheet: humidity sensitivity 'near zero (to 95% RH)', so no RH correction or RH flag is applied. Temperature response 'follows the ideal gas law' -> density correction applied.",
+      "datasheet": {
+        "source": "Alphasense PIDX-A-040 Technical Specification v1.1 (docs/alphasense/pidx-a-040_datasheet.pdf)",
+        "sensitivity": "55 mV/ppm +/-10% (isobutylene, tested at 10 ppm)",
+        "offset_mv": "40 to 100",
+        "min_detection_ppb": 1,
+        "linear_range_ppm": "0 to 40",
+        "t90_s": 6.5,
+        "warm_up_s": 5,
+        "full_stabilisation_min": 5,
+        "output_v": "0.040 to 2.85",
+        "humidity_sensitivity": "near zero (to 95% RH, non-condensing)",
+        "temperature_dependence": "follows the ideal gas law",
+        "lamp": "10.6 eV, ~10,000 h"
+      },
+      "t_cal_c": 25.0,
+      "p_cal_hpa": 1013.25,
+      "response_factor": 1.0,
+      "warmup_min": 5,
+      "adc_fsr_v": 2.56,
+      "adc_bits": 16,
+      "adc_bipolar": true
+    },
+    "sensors_prewarmed": true,
+    "enforce_lod": false
+  },
+  "dsp": {
+    "hampel_window": 9,
+    "hampel_n_sigma": 3.5,
+    "kalman_q_over_r": 0.05,
+    "noise_window": 60,
+    "trend_window": 10,
+    "rolling_window_sec": 600
+  },
+  "alarms": {
+    "h2s_ppm": {
+      "warning": 0.5,
+      "action": 1.5,
+      "critical": 5.0
+    },
+    "nh3_ppm": {
+      "warning": 5.0,
+      "action": 15.0,
+      "critical": 35.0
+    },
+    "voc_ppm": {
+      "warning": 2.0,
+      "action": 5.0,
+      "critical": 15.0
+    }
+  }
+}

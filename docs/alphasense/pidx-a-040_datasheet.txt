@@ -1,0 +1,99 @@
+PIDX-A-040 Photo Ionisation Detector
+Top View Side View Bottom View
+Technical specifications Version 1.1
+Electrical
+Key Specifications 
+Environmental 
+Power Consumption
+Supply Voltage
+Output Signal
+Operating Life 
+IS Approval 
+Temperature Range
+Temperature Dependence
+Relative Humidity Range
+Humidity Sensitivity
+92 mW
+3.2 to 5.5 VDC
+0.040 to 2.85 V
+5 years (excluding replaceable lamp and electrode stack)
+(No additional circuitry or external fusing required for intrinsic safety)
+-20ooC to 60ooC Intrinsically safe (-40 to 65°C operating temperature)
+See chart
+0 to 95% non-condensing
+Near zero (to 95%RH)
+Performance Target gases  
+Minimum Detection Level (ppb)
+Linear Range (ppm)
+Operating Range (ppm) 
+Typical Sensitivity
+Full Stabilisation Time
+Warm Up Time
+Offset Voltage (mV)
+Response Time (t90 sec)
+VOCs with ionisation potentials < 10.6 eV
+1
+0-40
+0-40
+55 mv/ppm ±10% (tested at 10 ppm)
+5 minutes
+5 seconds 
+40-100
+6.5
+Onboard Filter
+Lamp
+Electrode Stack
+Weight
+Position Sensitivity
+Warranty Period
+Patent information
+To remove liquids and particulates
+User Replaceable. Expected life = 10,000 hours
+User Replaceable
+<12 grams
+None
+Electronics and Housing 24 Months, Lamp 12 months. Electrode and lamp 
+are user replaceable. 10.6 eV lamp typical life 10,000 hours. 
+Patents pending
+Dimensions are in millimetres (+/- 0.1 mm). Use of socketed connection is required. Soldering or cutting the connection pins may permanently damage the sensor and void the warranty. 
+T: +44 (0)1376 556700 E: sensors.alphasense@ametek.com W: www.alphasense.com *Gain numbers measured with isobutylene at room temperature and sea level.
+For further information on the performance of this sensor, on other sensors in the range or any 
+other subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .
+¢ 20. 0
+I 6. 3 
+4.83 
+
+Fig. 1 PIDX-A-040 Linearity (0-40 ppm)
+Fig. 2 Sensitivity Temperature Dependence
+PIDX-A-040 Replacement Parts/Consumables List
+In the interest of continued product improvement, we reserve the right to change design features and specifications without prior notification. Please note that the information provided in this Technical Data 
+Sheet is preliminary and subject to change. The data contained in this document is for guidance only. Alphasense Ltd accepts no liability for any consequential losses, injury or damage resulting from the use 
+of this document or the information contained within.(©ALPHASENSE LTD) Doc. Ref. PIDX-A-040/OCT25
+At the end of the product’s life, do not dispose of any electronic sensor, component or instrument in the domestic waste, but contact the instrument manufacturer, Alphasense or its distributor for disposal 
+instructions. NOTE: all sensors are tested at ambient environmental conditions unless otherwise stated. As applications of use are outside our control, the information provided is given without legal 
+responsibility. Customers should test under their own conditions, to ensure that the sensors are suitable for their own requirements.
+Technical specifications Version 1.1
+Part Number  Description 
+001-0036-00  Gas Hood
+001-0050-00 Cap with Filter 
+001-0051-00 Detector Ionisation Cell Assembly
+001-0042-00 10.6 eV Lamp
+Part Number  Description 
+001-0048-00 Maintenance Kit, which includes:  
+   2 ea Polishing Disc
+   Cap with Filter     
+   1 ea Padded Swab
+001-0049-00 Sensor Rebuild Kit, which includes:
+   2 ea 10.6 eV Lamp    
+   1 ea Detector Ionisation Cell Assembly  
+   Cap with Filter
+Figure 1 shows the response curve of 20 sensors 
+throughout the entire operating range. Sensors are 
+linear throughout the entire range.
+Figure 2 shows the mean and ±95% confidence 
+intervals of the response of the sensors to 10 ppm 
+isobutylene over the entire temperature range. The 
+temperature response follows the ideal gas law.
+T: +44 (0)1376 556700 E: sensors.alphasense@ametek.com W: www.alphasense.com *Gain numbers measured with isobutylene at room temperature and sea level.
+For further information on the performance of this sensor, on other sensors in the range or any 
+other subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .

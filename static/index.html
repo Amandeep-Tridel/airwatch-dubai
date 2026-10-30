@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AirWatch Dubai — Live Air Quality</title>
+  <meta name="description" content="Live hydrogen sulfide, ammonia and VOC readings from the AQMS station in Dubai." />
+  <link rel="stylesheet" href="./vendor/uPlot.min.css" />
+  <link rel="stylesheet" href="./app.css?v=10" />
+  <script>
+    // Apply saved/system theme before paint to avoid a flash
+    (function () {
+      var t = localStorage.getItem("aw-theme");
+      if (!t) t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" fill="none" stroke="currentColor" stroke-width="2" opacity=".25" />
+        <path d="M6 19c3-5 6-5 9 0s6 5 11-3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+      </svg>
+      <div>
+        <div class="brand-name">AirWatch Dubai</div>
+        <div class="brand-sub">Station <span id="stationId">aqms-monitor</span> · <span id="dubaiClock">--:--</span> GST</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <span id="livePill" class="live-pill is-wait" role="status" aria-live="polite">
+        <span class="dot"></span><span id="liveText">Connecting…</span>
+      </span>
+      <div class="seg" role="group" aria-label="Units">
+        <button type="button" data-unit="ppm" aria-pressed="true">ppm</button>
+        <button type="button" data-unit="ppb" aria-pressed="false">ppb</button>
+      </div>
+      <button type="button" id="themeBtn" class="icon-btn" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- 1. One-sentence answer -->
+    <section id="statusBanner" class="status-banner tone-wait" aria-live="polite">
+      <div class="status-icon" id="statusIcon" aria-hidden="true"></div>
+      <div class="status-text">
+        <h1 id="statusHeadline">Loading the latest reading…</h1>
+        <p id="statusDetail">Fetching data from the Dubai station.</p>
+      </div>
+      <div class="status-meta">
+        <div><span class="k">Last reading</span><span class="v" id="lastReading">—</span></div>
+        <div><span class="k">Calibration</span><span class="v" id="calState">—</span></div>
+      </div>
+    </section>
+
+    <!-- 2. Gas cards -->
+    <section class="gas-grid" aria-label="Gas readings">
+      <article class="gas-card" data-gas="h2s" tabindex="0"></article>
+      <article class="gas-card" data-gas="nh3" tabindex="0"></article>
+      <article class="gas-card" data-gas="voc" tabindex="0"></article>
+    </section>
+
+    <!-- 3. Trend chart -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Trend</h2>
+          <p class="muted small">Tap a gas card or choose below. Hover the chart for exact values.</p>
+        </div>
+        <div class="panel-controls">
+          <div class="seg" role="group" aria-label="Gas" id="gasTabs">
+            <button type="button" data-gas="h2s" aria-pressed="true">H₂S</button>
+            <button type="button" data-gas="nh3" aria-pressed="false">NH₃</button>
+            <button type="button" data-gas="voc" aria-pressed="false">VOC</button>
+          </div>
+          <div class="seg" role="group" aria-label="Time range" id="rangeTabs">
+            <button type="button" data-hours="1" aria-pressed="false">1 h</button>
+            <button type="button" data-hours="6" aria-pressed="false">6 h</button>
+            <button type="button" data-hours="24" aria-pressed="true">24 h</button>
+          </div>
+        </div>
+      </div>
+      <div id="chart" class="chart" role="img" aria-label="Concentration over time"></div>
+      <div id="chartReadout" class="chart-readout" aria-live="off"></div>
+      <div class="chart-key">
+        <span><i class="key-line"></i>Measured (smoothed)</span>
+        <span><i class="key-dot"></i>Individual samples</span>
+      </div>
+    </section>
+
+    <!-- 4. 24-hour timeline -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Last 24 hours at a glance</h2>
+          <p class="muted small" id="timelineSub">Each block is 10 minutes. Hover a block for details.</p>
+        </div>
+        <div class="legend-chips" id="timelineLegend"></div>
+      </div>
+      <div id="timeline" class="timeline"></div>
+    </section>
+
+    <!-- 5. Conditions & station health -->
+    <section class="cond-grid" aria-label="Conditions and station health">
+      <div class="cond"><span class="k">Temperature</span><span class="v" id="cTemp">—</span><span class="s">Open-Meteo, Dubai</span></div>
+      <div class="cond"><span class="k">Humidity</span><span class="v" id="cRh">—</span><span class="s">relative humidity</span></div>
+      <div class="cond"><span class="k">Pressure</span><span class="v" id="cP">—</span><span class="s">surface</span></div>
+      <div class="cond">
+        <span class="k">Wind</span>
+        <span class="v wind"><svg id="windArrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l5 14-5-3-5 3z" fill="currentColor"/></svg><span id="cWind">—</span></span>
+        <span class="s" id="cWindDir">direction</span>
+      </div>
+      <div class="cond"><span class="k">Station power</span><span class="v" id="cBatt">—</span><span class="s" id="cBattS">battery</span></div>
+      <div class="cond"><span class="k">Data link</span><span class="v" id="cLink">—</span><span class="s" id="cLinkS">Firebase</span></div>
+    </section>
+
+    <!-- 6. Technical drawer -->
+    <details class="panel drawer" id="drawer">
+      <summary>
+        <span><strong>Technical details</strong> <span class="muted small">— raw signals, quality flags, calibration, recent packets</span></span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </summary>
+      <div class="drawer-body">
+        <div class="tech-grid">
+          <div>
+            <h3>Latest raw packet</h3>
+            <pre id="rawString" class="raw">—</pre>
+            <table class="kv" id="voltTable"></table>
+          </div>
+          <div>
+            <h3>Per-gas quality</h3>
+            <table class="kv" id="qualityTable"></table>
+          </div>
+        </div>
+        <h3>Recent packets</h3>
+        <div class="table-scroll">
+          <table class="grid-table" id="recentTable"></table>
+        </div>
+        <h3>How the numbers are made</h3>
+        <ul class="method">
+          <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary electrode): AAN 803 algorithm 1, <code>[(A1−WE_e) − n_T·(A2−AE_e)] / sensitivity</code>.</li>
+          <li><strong>NH₃</strong> (Alphasense NH3-B1, A0): 3-electrode conversion with H₂S cross-sensitivity compensation.</li>
+          <li><strong>VOC</strong> (Alphasense PIDX-A-040, A3): fixed clean-air zero plus ideal-gas temperature/pressure correction, reported as isobutylene equivalent.</li>
+          <li>Values are despiked and smoothed with a Hampel + 1D Kalman filter, with live 1σ noise estimates reported alongside every reading.</li>
+        </ul>
+        <p class="muted small" id="calNote"></p>
+        <div class="drawer-actions">
+          <a class="btn" id="csvBtn" href="./api/export/csv" download="aqms_dubai_telemetry.csv">Download CSV</a>
+          <a class="btn ghost" id="liveApiBtn" href="https://aqms-65300-default-rtdb.firebaseio.com/data.json?orderBy=%22%24key%22&limitToLast=5" target="_blank" rel="noopener">Firebase Live JSON</a>
+        </div>
+      </div>
+    </details>
+
+    <footer class="foot muted small">
+      Data: AQMS station via Firebase · Weather: Open-Meteo · Readings are indicative until sensors are certificate-calibrated.
+    </footer>
+  </main>
+
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+
+  <script src="./vendor/uPlot.iife.min.js"></script>
+  <script src="./standalone_engine.js?v=10"></script>
+  <script src="./app.js?v=10"></script>
+</body>
+</html>

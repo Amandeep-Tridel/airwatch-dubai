@@ -1,0 +1,395 @@
+H2S-B4 Hydrogen Sulfide Sensor – 4-Electrode
+Top View Side ViewBottom View
+Technical specifications Version 1.0
+T: +44 (0)1376 556700 E: sensors@alphasense.com W: www.alphasense.com
+Dimensions are in millimetres (± 0.15 mm).
+For further information on the performance of this sensor, on other sensors in the range or any other 
+subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .
+Temperature range 
+Pressure range
+Humidity range 
+Storage period
+Load resistor 
+Weight
+°C
+kPa
+% rh continuous
+months @ 3 to 20°C (stored in sealed pot)
+� (ISB circuit is recommended)
+g
+-30 to 50
+80 to 120
+15 to 90
+6
+33 to 100
+< 13
+Key Specifications
+< -10
+< -12
+< 12
+< 20
+< 3
+< 0.5
+< 0.1
+< 0.1
+< 0.1
+Cross Sensitivity NO2 sensitivity % measured gas @ 5ppm NO2
+Cl2 sensitivity % measured gas @ 5ppm Cl2
+NO sensitivity % measured gas @ 5ppm NO
+SO2 sensitivity % measured gas @ 5ppm SO2
+CO sensitivity % measured gas @ 5ppm CO
+H2 sensitivity % measured gas @ 100ppm H 2
+C2H4 sensitivity % measured gas @ 100ppm C2H4
+NH3 sensitivity % measured gas @ 20ppm NH3
+CO2 sensitivity % measured gas @ 5% CO2
+Zero drift
+Sensitivity drift
+Operating life
+ppm equivalent change/year in lab air
+% change/year in lab air, monthly test
+months until 50% original signal (24-month warranted)
+< ± 100
+< 20
+> 24
+Lifetime
+Sensitivity @ -20°C
+Sensitivity @ 50°C
+Zero @ -20°C
+Zero @ 50°C
+% (output @ -20°C/output @ 20°C) @ 2ppm H2S
+% (output @ 50°C/output @ 20°C) @ 2ppm H2S
+nA change from 20°C
+nA change from 20°C
+Environmental 77 to 90
+100 to 110
+50 to 60
+-120 to -160
+PERFORMANCE Sensitivity nA/ppm at 2ppm H2S 1450 to 2600
+Response time t90 (s) from zero to 2ppm H2S < 60
+Zero current nA in zero air at 20°C  -250 to 200
+Noise* ±2 standard deviations (ppb equivalent) 1
+Range ppm H2S limit of performance warranty 100
+Linearity ppb error at full scale, linear at zero and 40ppm H2S < ±4
+Overgas limit maximum ppm for stable response to gas pulse 200
+* Tested with Alphasense ISB low noise circuit
+LIFETIME Zero drift ppb equivalent change/year in lab air < ±100
+Sensitivity drift % change/year in lab air, monthly test < 20
+Operating life months until 50% original signal (24 month warranted) > 24
+ENVIRONMENTAL Sensitivity @ -20°C (% output @ -20°C/output @ 20°C) @ 2ppm H2S 77 to 90
+Sensitivity @  50°C (% output @  50°C/output @ 20°C) @ 2ppm H2S 100 to 110
+Zero @ -20°C nA change from 20°C 50 to 60
+Zero @  50°C nA change from 20°C -120 to -160
+CROSS NO2 sensitivity % measured gas @ 5ppm NO2 < -10
+SENSITIVITY Cl2 sensitivity % measured gas @ 5ppm Cl2 < -12
+NO sensitivity % measured gas @ 5ppm NO < 12
+SO2 sensitivity % measured gas @ 5ppm SO2 < 20
+CO sensitivity % measured gas @ 5ppm CO < 3
+H2 sensitivity % measured gas @ 100ppm H2 < 0.5
+C2H4 sensitivity % measured gas @ 100ppm C2H4 < 0.1
+NH3 sensitivity % measured gas @ 20ppm NH3 < 0.1
+CO2 sensitivity % measured gas @ 5% CO2 < 0.1
+KEY Temperature range°C -30 to 50
+SPECIFICATIONS Pressure range kPa 80 to 120
+Humidity range % rh 15 to 90
+Storage period months @ 3 to 20°C (stored in sealed pot) 6
+Load resistor Ω (ISB circuit is recommended) 33 to 100
+Weight g < 13
+□□□□□ □□□□□□□□□□□□□ □□□□ □□□□□□□□□ □□
+All dimensions in millimetres (± 0.15mm)
+Top View Bottom View Side View
+NOTE: all sensors are tested at ambient environmental conditions, with 47 ohm load resistor,  unless otherwise stated. As applications of use are outside our control, the
+information provided is given without legal responsibility. Customers should test under their own conditions, to ensure that the sensors are suitable for their own requirements.
+At the end of the productʼs life, do not dispose of any electronic sensor, component or instrument in the domestic waste, but contact the
+instrument manufacturer, Alphasense or its distributor for disposal instructions.
+Alphasense Ltd, Sensor Technology House, 300 Avenue West, Skyline 120, Great Notley. CM77 7AA. UK
+Telephone: +44 (0) 1376 556 700     Fax: +44 (0) 1376 335 899     E-mail: sensors@alphasense.com     Website: www.alphasense.com
+□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□ □□□□□□□□□□□□□□□□□□□□ □□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□
+□□□□□□□□□□□□□□□ □□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□
+□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□
+Sensitivity
+Response time
+Zero current
+Noise*
+Range
+Linearity
+Overgas limit
+*Tested with Alphasense ISB low noise circuit
+1450 to 2600
+< 60
+-250 to 200
+1
+100
+< ± 4
+200
+nA/ppm at 2ppm H2S
+t90 (s) from zero to 2ppm H2S
+nA in zero air at 20°C
+±2 standard deviations (ppb equivalent)
+ppm H2S limit of performance warranty
+ppb error at full scale, linear at zero and 40ppm H2S 
+maximum ppm for stable response to gas pulse
+Performance
+Figure 1 Sensitivity Temperature Dependence
+Figure 2 Zero Temperature Dependence
+Figure 3 Linearity to 200 ppb H2S
+In the interest of continued product improvement, we reserve the right to change design features and specifications without prior notification. The data contained in this document is for guidance only. 
+Alphasense Ltd accepts no liability for any consequential losses, injury or damage resulting from the use of this document or the information contained within.(©ALPHASENSE LTD) Doc. Ref. H2S-A4/OCT22
+At the end of the product’s life, do not dispose of any electronic sensor, component or instrument in the domestic waste, but contact the instrument manufacturer, Alphasense or its distributor for disposal 
+instructions. NOTE: all sensors are tested at ambient environmental conditions unless otherwise stated. As applications of use are outside our control, the information provided is given without legal 
+responsibility. Customers should test under their own conditions, to ensure that the sensors are suitable for their own requirements.
+T: +44 (0)1376 556700 E: sensors@alphasense.com W: www.alphasense.com For further information on the performance of this sensor, on other sensors in the range or any other 
+subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .
+Technical specifications Version 1.0
+Figure 1 shows the temperature dependence of 
+sensitivity at 2ppm H2S.
+This data is taken from a typical batch of sensors.
+Figure 2 shows the variation in zero output of the 
+working electrode caused by changes in 
+temperature, expressed as nA.
+This data is taken from a typical batch of sensors.
+Contact Alphasense for futher information on zero 
+current correction.
+Figure 3 shows response to 200ppb H2S.
+Use of Alphasense ISB circuit reduces noise to 1ppb, 
+with the opportunity of digital smoothing to reduce 
+noise even further.
+-250
+-200
+-150
+-100
+-50
+0
+50
+-30 -20 -10 0 10 20 30 40 50
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4 PH2S-B4 PH2S-B4 PH2S-B4 PH2S-B4 Perferferferferformance Daormance Daormance Daormance Daormance Datatatatata
+TTTTTececececechnical Specifhnical Specifhnical Specifhnical Specifhnical Specificaicaicaicaicationtiontiontiontion
+In the interest of continued product improvement, we reserve the right to change design features and specifications without prior notification. The data contained in this
+document is for guidance only. Alphasense Ltd accepts no liability for any consequential losses, injury or damage resulting from the use of this document or the information
+contained within. ( ©ALPHASENSE LTD ) Doc. Ref.  H2SB4/SEPT19
+For further information on the performance of this sensor, on other sensors in the range or any other subject, please contact
+Alphasense Ltd. For Application Notes visit “www.alphasense.com”.
+Figure 2 Sensitivity Temperature Dependence
+Temperature (OC)
+% Output (referenced to 20oC)
+Figure 3 Zero Temperature Dependence
+Zero current (nA)
+Temperature (OC)
+  Figure 4  Linearity to 200 ppb H2S
+Time (s)
+Output (mV)
+70
+75
+80
+85
+90
+95
+100
+105
+110
+-30 -20 -10 0 10 20 30 40 50
+Figure 3 shows the variation in
+zero output of the working
+electrode caused by changes in
+temperature, expressed as nA.
+This data is taken from a typical
+batch of sensors.
+Contact Alphasense for futher
+information on zero current
+correction.
+Figure 4 shows response to
+200ppb H2S.
+Use of Alphasense ISB circuit
+reduces noise to 1ppb, with the
+opportunity of digit al smooting
+to reduce noise even further
+Figure 2 shows the temperature
+dependence of sensitivity at
+2ppm H2S.
+This data is taken from a typical
+batch of sensors.
+300
+350
+400
+450
+500
+550
+600
+650
+0 1000 2000 3000 4000 5000 6000 7000 8000 9000
+0 ppb
+160 ppb
+120 ppb
+100 ppb
+80 ppb
+60 ppb
+40 ppb
+20 ppb
+0 ppb
+200 ppb
+-250
+-200
+-150
+-100
+-50
+0
+50
+-30 -20 -10 0 10 20 30 40 50
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4 PH2S-B4 PH2S-B4 PH2S-B4 PH2S-B4 Perferferferferformance Daormance Daormance Daormance Daormance Datatatatata
+TTTTTececececechnical Specifhnical Specifhnical Specifhnical Specifhnical Specificaicaicaicaicationtiontiontiontion
+In the interest of continued product improvement, we reserve the right to change design features and specifications without prior notification. The data contained in this
+document is for guidance only. Alphasense Ltd accepts no liability for any consequential losses, injury or damage resulting from the use of this document or the information
+contained within. ( ©ALPHASENSE LTD ) Doc. Ref.  H2SB4/SEPT19
+For further information on the performance of this sensor, on other sensors in the range or any other subject, please contact
+Alphasense Ltd. For Application Notes visit “www.alphasense.com”.
+Figure 2 Sensitivity Temperature Dependence
+Temperature (OC)
+% Output (referenced to 20oC)
+Figure 3 Zero Temperature Dependence
+Zero current (nA)
+Temperature (OC)
+  Figure 4  Linearity to 200 ppb H2S
+Time (s)
+Output (mV)
+70
+75
+80
+85
+90
+95
+100
+105
+110
+-30 -20 -10 0 10 20 30 40 50
+Figure 3 shows the variation in
+zero output of the working
+electrode caused by changes in
+temperature, expressed as nA.
+This data is taken from a typical
+batch of sensors.
+Contact Alphasense for futher
+information on zero current
+correction.
+Figure 4 shows response to
+200ppb H2S.
+Use of Alphasense ISB circuit
+reduces noise to 1ppb, with the
+opportunity of digit al smooting
+to reduce noise even further
+Figure 2 shows the temperature
+dependence of sensitivity at
+2ppm H2S.
+This data is taken from a typical
+batch of sensors.
+300
+350
+400
+450
+500
+550
+600
+650
+0 1000 2000 3000 4000 5000 6000 7000 8000 9000
+0 ppb
+160 ppb
+120 ppb
+100 ppb
+80 ppb
+60 ppb
+40 ppb
+20 ppb
+0 ppb
+200 ppb
+-250
+-200
+-150
+-100
+-50
+0
+50
+-30 -20 -10 0 10 20 30 40 50
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4
+H2S-B4 PH2S-B4 PH2S-B4 PH2S-B4 PH2S-B4 Perferferferferformance Daormance Daormance Daormance Daormance Datatatatata
+TTTTTececececechnical Specifhnical Specifhnical Specifhnical Specifhnical Specificaicaicaicaicationtiontiontiontion
+In the interest of continued product improvement, we reserve the right to change design features and specifications without prior notification. The data contained in this
+document is for guidance only. Alphasense Ltd accepts no liability for any consequential losses, injury or damage resulting from the use of this document or the information
+contained within. ( ©ALPHASENSE LTD ) Doc. Ref.  H2SB4/SEPT19
+For further information on the performance of this sensor, on other sensors in the range or any other subject, please contact
+Alphasense Ltd. For Application Notes visit “www.alphasense.com”.
+Figure 2 Sensitivity Temperature Dependence
+Temperature (OC)
+% Output (referenced to 20oC)
+Figure 3 Zero Temperature Dependence
+Zero current (nA)
+Temperature (OC)
+  Figure 4  Linearity to 200 ppb H2S
+Time (s)
+Output (mV)
+70
+75
+80
+85
+90
+95
+100
+105
+110
+-30 -20 -10 0 10 20 30 40 50
+Figure 3 shows the variation in
+zero output of the working
+electrode caused by changes in
+temperature, expressed as nA.
+This data is taken from a typical
+batch of sensors.
+Contact Alphasense for futher
+information on zero current
+correction.
+Figure 4 shows response to
+200ppb H2S.
+Use of Alphasense ISB circuit
+reduces noise to 1ppb, with the
+opportunity of digit al smooting
+to reduce noise even further
+Figure 2 shows the temperature
+dependence of sensitivity at
+2ppm H2S.
+This data is taken from a typical
+batch of sensors.
+300
+350
+400
+450
+500
+550
+600
+650
+0 1000 2000 3000 4000 5000 6000 7000 8000 9000
+0 ppb
+160 ppb
+120 ppb
+100 ppb
+80 ppb
+60 ppb
+40 ppb
+20 ppb
+0 ppb
+200 ppb

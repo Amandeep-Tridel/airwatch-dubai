@@ -1,0 +1,305 @@
+Technical Specifications Version 1.1
+T: +44 (0)1376 556700 E: sensors.alphasense@ametek.com W: www.alphasense.com For further information on the performance of this sensor, on other sensors in the range or any 
+other subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .
+Dimensions are in millimetres (± 0.15 mm).
+NH3-B1 Ammonia Sensor – 3-Electrode 
+NH3-B1+ Ammonia Sensor – 3-Electrode (with Integrated Smart Technology)
+Top View
+Top View
+Bottom View
+Bottom View
+Side View
+IST Board
+Side View
+NH3-B1/NH3-B1+ Ammonia Sensor 
+The NH3-B1 sensor is a PPM sensor that is designed for a broad variety of applications and instrumentation including portable 
+gas detectors and fixed gas detection systems for industrial safety, environmental air quality and process control. This product is 
+available in our standard format (NH3-B1) and with our patented Integrated Smart Technology (NH3-B1+) that has an IST board 
+with a memory chip and temperature sensor integrated in the sensor. The + sensors store specific calibration, specification, and 
+identification data on every sensor allowing plug and play operation. The on-board temperature sensor improves the accuracy 
+and simplicity of temperature compensation algorithms.
+Technical Specifications Version 1.1
+T: +44 (0)1376 556700 E: sensors.alphasense@ametek.com W: www.alphasense.com For further information on the performance of this sensor, on other sensors in the range or any 
+other subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .
+Sensor Data
+Bias voltage
+Temperature range
+Pressure range
+Humidity range 
+Storage period
+Load resistor 
+Weight
+mV (Working Electrode potential is above ground)
+°C
+kPa
+% rh continuous
+months @ 3 to 20°C (stored in sealed pot)
+� (recommended)
+g
++200
+-30 to 50
+80 to 120
+15 to 90
+6
+10 to 47
+< 13
+Key Specifications
+< -200
+< -200
+< -400
+< -300
+< -300
+< 20
+< 15
+nd
+nd
+Cross-sensitivity H2S sensitivity % measured gas @ 20ppm H2S
+NO2 sensitivity % measured gas @ 20ppm NO2
+Cl2 sensitivity % measured gas @ 10ppm Cl2
+NO sensitivity % measured gas @ 50ppm NO
+SO2 sensitivity % measured gas @ 20ppm SO2
+CO sensitivity % measured gas @ 400ppm CO
+H2 sensitivity % measured gas @ 400ppm H 2
+C2H4 sensitivity % measured gas @ 400ppm C2H4
+CO2 sensitivity % measured gas @ 5% CO2
+Zero drift
+Sensitivity drift
+Operating life
+ppm equivalent change/year in lab air
+% change/year in lab air, monthly test
+months until 80% original signal (12-month warranted)
+< 2
+< 3
+> 24
+Lifetime
+Sensitivity @ -20°C
+Sensitivity @ 40°C
+Zero @ -20°C
+Zero @ 50°C
+% (output @ -20°C/output @ 20°C) @ 20ppm
+% (output @ 40°C/output @ 20°C) @ 20ppm
+ppm equivalent change from 20°C
+ppm equivalent change from 20°C
+Environmental nd
+nd
+nd
+nd
+Sensitivity
+Response time
+Zero current
+Range
+Linearity
+Overgas limit
+20 to 60
+< 150
+< ± 10
+100
++5 to -5
+200
+nA/ppm in 50ppm NH3
+t90 (s) from zero to 50ppm NH3
+ppm equivalent in zero air
+ppm NH3 limit of performance warranty
+ppm error at full scale, linear at zero and 70ppm NH3 
+maximum ppm for stable response to gas pulse
+Performance
+Technical Specifications Version 1.1
+T: +44 (0)1376 556700 E: sensors.alphasense@ametek.com W: www.alphasense.com For further information on the performance of this sensor, on other sensors in the range or any 
+other subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .
+Figure 1 Response to Gas
+Figure 2 Linearity
+Figure 1 shows the typical response to 50ppm NH3  
+at 20°C
+t50 is significantly faster than t90 (30 vs. 150 seconds) 
+and shows the sensorʼs ability to respond quickly  
+to NH3.
+Figure 2 shows the deviation from linear response  
+from 0 to 100ppm NH3, with 0 and 70ppm  
+reference concentrations.
+NH3-B1 PNH3-B1 PNH3-B1 PNH3-B1 PNH3-B1 Perferferferferformance Daormance Daormance Daormance Daormance Datatatatata
+TTTTTececececechnical Specifhnical Specifhnical Specifhnical Specifhnical Specificaicaicaicaicationtiontiontiontion
+In the interest of continued product improvement, we reserve the right to change design features and specifications without prior notification. The data contained in this
+document is for guidance only. Alphasense Ltd accepts no liability for any consequential losses, injury or damage resulting from the use of this document or the informa-
+tion contained within. ( ©ALPHASENSE LTD ) Doc. Ref.  NH3-B1/MAY21
+For further information on the performance of this sensor, on other sensors in the range or any other subject, please contact
+Alphasense Ltd. For Application Notes visit “www.alphasense.com”.
+Figure 2 Response to Gas
+Figure 2 shows the typical
+response to 50ppm NH3 at 20oC
+t50 is significantly faster than t90
+(30 vs. 150 seconds) and
+shows the sensor ’s ability to
+respond quickly to NH3.
+Time (s)
+Output (nA)
+0
+500
+1000
+1500
+2000
+2500
+0 300 600 900 1200 1500
+-15
+-12
+-9
+-6
+-3
+0
+3
+6
+9
+12
+15
+0 10 20 30 40 50 60 70 80 90 100
+ppm NH3
+Deviation from linearity (ppm)
+Figure 3 Linearity
+Figure 3 shows the deviation
+from linear response from 0 to
+100ppm NH3, with 0 and 70ppm
+reference concentrations.
+At the end of the product’ s life, do not dispose of any electronic sensor , component or instrument in the domestic waste, but cont act the
+instrument manufacturer , Alphasense or it s distributor for disposal instructions.
+NH3-B1 PNH3-B1 PNH3-B1 PNH3-B1 PNH3-B1 Perferferferferformance Daormance Daormance Daormance Daormance Datatatatata
+TTTTTececececechnical Specifhnical Specifhnical Specifhnical Specifhnical Specificaicaicaicaicationtiontiontiontion
+In the interest of continued product improvement, we reserve the right to change design features and specifications without prior notification. The data contained in this
+document is for guidance only. Alphasense Ltd accepts no liability for any consequential losses, injury or damage resulting from the use of this document or the informa-
+tion contained within. ( ©ALPHASENSE LTD ) Doc. Ref.  NH3-B1/MAY21
+For further information on the performance of this sensor, on other sensors in the range or any other subject, please contact
+Alphasense Ltd. For Application Notes visit “www.alphasense.com”.
+Figure 2 Response to Gas
+Figure 2 shows the typical
+response to 50ppm NH3 at 20oC
+t50 is significantly faster than t90
+(30 vs. 150 seconds) and
+shows the sensor ’s ability to
+respond quickly to NH3.
+Time (s)
+Output (nA)
+0
+500
+1000
+1500
+2000
+2500
+0 300 600 900 1200 1500
+-15
+-12
+-9
+-6
+-3
+0
+3
+6
+9
+12
+15
+0 10 20 30 40 50 60 70 80 90 100
+ppm NH3
+Deviation from linearity (ppm)
+Figure 3 Linearity
+Figure 3 shows the deviation
+from linear response from 0 to
+100ppm NH3, with 0 and 70ppm
+reference concentrations.
+At the end of the product’ s life, do not dispose of any electronic sensor , component or instrument in the domestic waste, but cont act the
+instrument manufacturer , Alphasense or it s distributor for disposal instructions.
+Technical Specifications Version 1.1
+T: +44 (0)1376 556700 E: sensors.alphasense@ametek.com W: www.alphasense.com For further information on the performance of this sensor, on other sensors in the range or any 
+other subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .
+T: +44 (0)1376 556700 E: sensors.alphasense@ametek.com W: www.alphasense.com For further information on the performance of this sensor, on other sensors in the range or any 
+other subject, please contact Alphasense Ltd. or visit our website at “www.alphasense.com” .
+Data & Communication
+Supply Voltage Range 
+Supply current – Stand-By 
+Supply current – Operating 
+Power Supply Conditioning 
+ESD Protection 
+Bus Pins Input Capacitance
+Electrical
+Communication Bus 
+Max. Bus Speed
+Input Logic Levels 
+Absolute Max. Input Signal
+Compatible with the 400 kHz I²C protocol
+Up to 1 MHz
+High (Recessive) < 2.3 V  |  Low (Dominant) < 0.2 V
+3.6 V
+Interface
+Operational Temperature 
+Temperature Sensor Accuracy 
+Memory Data Retention 
+Memory Write Cycles
+Performance
+1.7 V to 3.6 V 
+< 5 μA 
+< 0.15 mA (temperature reading only) 
+< 2.15 mA (temperature reading + memory reading/writing) 
+Built-In 100 nF decoupling capacitor 
+4 kV (human body model) - Enhanced ESD / Latch-Up protection 
+15 pF max.
+–40 °C to +85 °C 
+±1°C (-0°C to +70°C) 
+> 200 years 
+> 4,000,000
+Memory IC & I2C Address 
+Temperature IC & I2C Address 
+Product Data Start Address 
+Calibration Data Start Address 
+User Data Area 
+CRC Polynomial 
+Digital Signature Algorithm
+M24128X-FCU  |  Device Address: R - 0xA0  /  W – 0xA1 
+MAX31875R0TZS+T  |  Device Address: R - 0x90  /  W – 0x91 
+0x0900 
+0x0B00 
+0x0D00 – 0x18FF (3,072 Bytes) 
+0x 01 04C1 1DB7 
+SHA-256
+IST Board Data
+Factory-populated data
+Data Format Version 
+Customer (OEM) ID 
+Product ID 
+Type of Sensor / Target Gas 
+Sensor Serial Number 
+End of Storage Period Date 
+Sensor Replacement Date 
+Product Data Checksum
+Alphasense Digital Signature 
+Customer Digital Signature
+Product Data
+Calibration Data Units 
+Zero (clean dry air) Output 
+Calibration Span 
+Calibration Output 
+Sensitivity 
+Calibration Date 
+Calibration Data Checksum 
+Calibration Data Signature
+Calibration
+Over-gas limit 
+Concentration Range 
+Temperature Range Low 
+Temperature Range High 
+Humidity Range Low 
+Humidity Range High 
+Pressure Range Low 
+Pressure Range High 
+Specification Checksum
+Sensor Specification
+Custom Parameters 
+Re-Calibration Due Date 
+Operational Limits: 
+Low | High | STEL | TWA
+Next Bump Test Due Date 
+User Data Area
+Customer Specific
+15,000+ locations 
+In the interest of continued product improvement, we reserve the right to change design features and specifications without prior notification. The data contained in this document is for guidance only. 
+Alphasense Ltd accepts no liability for any consequential losses, injury or damage resulting from the use of this document or the information contained within.(©ALPHASENSE LTD) Doc. Ref. NH3-B1/FEB24
+At the end of the product’s life, do not dispose of any electronic sensor, component or instrument in the domestic waste, but contact the instrument manufacturer, Alphasense or its distributor for disposal 
+instructions. NOTE: all sensors are tested at ambient environmental conditions unless otherwise stated. As applications of use are outside our control, the information provided is given without legal 
+responsibility. Customers should test under their own conditions, to ensure that the sensors are suitable for their own requirements.
+NOTE: All sensors are tested at ambient environmental conditions, with 47 ohm load resistor, unless otherwise stated. As applications of use are outside our control, the information provided is given 
+without legal responsibility. Customers should test under their own conditions, to ensure that the sensors are suitable for their own requirements.

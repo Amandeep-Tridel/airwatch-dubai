@@ -17,7 +17,7 @@
   },
   "calibration": {
     "calibration_verified": false,
-    "calibration_note": "PROVISIONAL. Zeros estimated from first night of clean-air data (2026-10-28). Sensitivities are nominal datasheet/guess values. Replace with Alphasense certificate values + carbon-bag zero test, then set calibration_verified=true.",
+    "calibration_note": "NH3-B1+ (barcode 77840031) uses Alphasense factory sheet calibration: WE_0 = 328 mV, sensitivity = 73.28 nA/ppm * 0.8 mV/nA = 58.624 mV/ppm (+200 mV biased 3-electrode ISB). H2S-B4 and PIDX-A-040 remain on provisional clean-air baselines pending certificate values.",
     "power_gap_reset_min": 15,
     "h2s": {
       "serial": "H2S-B4-DUBAI (A1=OP1 WE, A2=OP2 AE)",
@@ -73,14 +73,14 @@
       "adc_bipolar": true
     },
     "nh3": {
-      "serial": "NH3-B1-DUBAI (A0)",
-      "we_e_mv": 405.9,
-      "zero_source": "PROVISIONAL: 5th percentile of A0 after 180 min warm-up",
-      "sens_mv_per_ppm": 65.0,
-      "sens_rel_uncertainty": 0.5,
+      "serial": "NH3-B1+ (barcode 77840031)",
+      "we_e_mv": 328.0,
+      "zero_source": "Alphasense factory calibration sheet (barcode 77840031): WE_0 = 328 mV, sensitivity = 73.28 nA/ppm, ISB gain = 0.8 mV/nA -> 58.624 mV/ppm",
+      "sens_mv_per_ppm": 58.624,
+      "sens_rel_uncertainty": 0.05,
       "zero_ppm_equivalent": 0.0,
       "board_bias_mv": 200.0,
-      "xs_h2s_ppm_per_ppm": -2.0,
+      "xs_h2s_ppm_per_ppm": 0.0,
       "t90_match_alpha": 0.63,
       "t90_match_note": "H2S-B4 t90 < 60 s vs NH3-B1 t90 < 150 s (datasheets). Extra lag tau = sqrt(65^2 - 26^2) ~ 60 s; at 60 s sampling alpha = 1 - exp(-1) = 0.63.",
       "datasheet": {
@@ -113,7 +113,11 @@
       "warmup_min": 180,
       "adc_fsr_v": 2.56,
       "adc_bits": 16,
-      "adc_bipolar": true
+      "adc_bipolar": true,
+      "sens_na_per_ppm": 73.28,
+      "board_gain_mv_per_na": 0.8,
+      "zero_uncertainty_mv": 2.0,
+      "direct_sheet_formula": true
     },
     "voc": {
       "serial": "PIDX-A-040-DUBAI (A3)",

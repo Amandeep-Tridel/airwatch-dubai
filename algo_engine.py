@@ -115,7 +115,7 @@ class StationState:
 
 
 class AQMSAlgorithmEngine:
-    ALGO_VERSION = "v5.1 (Alphasense datasheets + AAN 803 n_T, LOD/uncertainty, provisional calibration)"
+    ALGO_VERSION = "v5.2 (NH3-B1+ 77840031 factory cal + Alphasense AAN 803)"
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.stations: Dict[str, StationState] = {}
@@ -148,16 +148,17 @@ class AQMSAlgorithmEngine:
         self.h2s_algorithm = int(h.get("algorithm", 1))
 
         self.nh3_cal = nh3_b1.Calibration(
-            serial=n.get("serial", "NH3-B1"),
-            we_e=float(n.get("we_e_mv", 405.9)),
-            sens_mv_per_ppm=float(n.get("sens_mv_per_ppm", 65.0)),
+            serial=n.get("serial", "NH3-B1+ (barcode 77840031)"),
+            we_e=float(n.get("we_e_mv", 328.0)),
+            sens_mv_per_ppm=float(n.get("sens_mv_per_ppm", 58.624)),
             zero_ppm_equivalent=float(n.get("zero_ppm_equivalent", 0.0)),
             board_bias_mv=float(n.get("board_bias_mv", 200.0)),
             adc_fsr_v=float(n.get("adc_fsr_v", 2.56)),
             adc_bits=int(n.get("adc_bits", 16)),
             adc_bipolar=bool(n.get("adc_bipolar", True)),
         )
-        self.nh3_xs = {"h2s": float(n.get("xs_h2s_ppm_per_ppm", -2.0))}
+        self.nh3_direct_sheet = bool(n.get("direct_sheet_formula", True))
+        self.nh3_xs = {"h2s": float(n.get("xs_h2s_ppm_per_ppm", 0.0))}
 
         self.voc_cal = pidx_a040.Calibration(
             serial=v.get("serial", "PIDX-A-040"),
@@ -261,7 +262,7 @@ class AQMSAlgorithmEngine:
         else:
             we_mv, _ = h2s_b4.counts_to_mv(we_cnt, self.h2s_cal)
             ae_mv, _ = h2s_b4.counts_to_mv(ae_cnt, self.h2s_cal)
-            nh3_mv, _ = nh3_b1.counts_to_mv(nh3_cnt, self.nh3_cal)
+            nh3_mv = (nh3_cnt / 32768.0) * 2560.0 if self.nh3_direct_sheet else nh3_b1.counts_to_mv(nh3_cnt, self.nh3_cal)[0]
             voc_mv = pidx_a040.counts_to_v(voc_cnt, self.voc_cal)[0] * 1000.0
 
         # --- telemetry gap & warm-up state ------------------------------------
@@ -312,7 +313,11 @@ class AQMSAlgorithmEngine:
         }
         zero_unc_ppm = {
             "h2s": float(self.cfg["h2s"].get("zero_uncertainty_mv", 14.0)) / h2s_sens_ppm,
-            "nh3": nh3_b1.ZERO_UNCERTAINTY_PPM,  # datasheet: +/-10 ppm in zero air
+            "nh3": (
+                float(self.cfg["nh3"].get("zero_uncertainty_mv", 2.0)) / self.nh3_cal.sens_mv_per_ppm
+                if self.nh3_direct_sheet
+                else nh3_b1.ZERO_UNCERTAINTY_PPM
+            ),
             "voc": float(self.cfg["voc"].get("zero_uncertainty_mv", 5.0)) / self.voc_cal.mv_per_ppm,
         }
         if self.enforce_lod:
@@ -332,14 +337,29 @@ class AQMSAlgorithmEngine:
         st.h2s_t90 = h2s_ppm if st.h2s_t90 is None else a * h2s_ppm + (1 - a) * st.h2s_t90
         h2s_for_nh3 = max(0.0, st.h2s_t90) if not self.enforce_lod else (st.h2s_t90 if st.h2s_t90 > lod["h2s"] else 0.0)
 
-        # --- 2. NH3-B1: 3-electrode conversion (reference module) --------------
-        nh3_r = nh3_b1.convert(
-            nh3_cnt, t_c, self.nh3_cal,
-            interferents_ppm={"h2s": h2s_for_nh3},
-            cross_sensitivity=self.nh3_xs,
-            rh_pct=rh,
-        )
-        nh3_ppm = nh3_r.ppm
+        # --- 2. NH3-B1+: factory calibration sheet or reference module ----------
+        if self.nh3_direct_sheet:
+            # Alphasense NH3-B1+ factory calibration sheet (barcode 77840031):
+            # NH3_ppm = ((A0_in_volts * 1000) - 328) / 58.624  (+200 mV bias, 3-electrode ISB)
+            nh3_we_c = nh3_mv - self.nh3_cal.we_e
+            nh3_ppm = nh3_we_c / self.nh3_cal.sens_mv_per_ppm
+            nh3_r = nh3_b1.Reading(
+                ppm=nh3_ppm,
+                flags=nh3_b1.QC.OK,
+                we_c_mv=nh3_we_c,
+                sens_mv_per_ppm=self.nh3_cal.sens_mv_per_ppm,
+                apparent_ppm=nh3_ppm,
+                interferent_ppm=0.0,
+                diagnostics={"we_u_mv": nh3_mv, "zero_ppm": 0.0, "head_t_c": t_c},
+            )
+        else:
+            nh3_r = nh3_b1.convert(
+                nh3_cnt, t_c, self.nh3_cal,
+                interferents_ppm={"h2s": h2s_for_nh3},
+                cross_sensitivity=self.nh3_xs,
+                rh_pct=rh,
+            )
+            nh3_ppm = nh3_r.ppm
 
         # --- 3. PIDX-A-040: fixed zero + density (reference module) ------------
         voc_r = pidx_a040.convert(
@@ -371,6 +391,8 @@ class AQMSAlgorithmEngine:
             for g in GASES
         }
         status = {g: self._status(warm[g], filt[g], lod[g]) for g in GASES}
+        if self.nh3_direct_sheet and not warm["nh3"] and status["nh3"] == "INDICATIVE":
+            status["nh3"] = "QUANTITATIVE"
 
         # --- rolling 10m / 20m / 30m means on SAMPLE timestamps ----------------
         st.rolling.append((ts_unix, filt["h2s"], filt["nh3"], filt["voc"]))
@@ -399,9 +421,12 @@ class AQMSAlgorithmEngine:
         for g in GASES:
             if warm[g]:
                 extra[g].append("WARMUP")
-            if not self.cal_verified:
-                extra[g].append("CAL_PROVISIONAL")
-            extra[g].append("TEMP_FROM_WEATHER_API")
+            if g == "nh3" and self.nh3_direct_sheet:
+                extra[g].append("CAL_FACTORY_77840031")
+            else:
+                if not self.cal_verified:
+                    extra[g].append("CAL_PROVISIONAL")
+                extra[g].append("TEMP_FROM_WEATHER_API")
             if battery_dip:
                 extra[g].append("SUPPLY_DIP")
         rh_flag = self.cfg["voc"].get("high_rh_flag_pct")

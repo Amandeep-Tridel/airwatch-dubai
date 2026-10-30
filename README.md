@@ -9,7 +9,7 @@ Real-time air quality monitoring dashboard and Alphasense sensor conversion engi
 - **Optional FastAPI Backend ([`server.py`](server.py)):** Run locally (`python server.py`) for server-side CSV logging, WebSocket streaming, and REST APIs (`/api/live`, `/api/history`, `/api/detail`, `/api/export/csv`).
 - **Alphasense Datasheet Algorithms ([`gas_algo/`](gas_algo/), [`algo_engine.py`](algo_engine.py)):**
   - **`H2S-B4`** (`A1` working / `A2` auxiliary): AAN 803-05 Algorithm 1 (`[(WE − WE_e) − n_T·(AE − AE_e)] / sensitivity(T)`).
-  - **`NH3-B1`** (`A0` working): 3-electrode conversion with `t90`-matched `H₂S` cross-sensitivity compensation.
+  - **`NH3-B1+`** (`A0` working, barcode `77840031`): Alphasense factory calibration sheet formula `((A0_V × 1000) − 328) / 58.624` (`WE₀ = 328 mV`, `73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm`, +200 mV biased 3-electrode ISB).
   - **`PIDX-A-040`** (`A3` 10.6 eV PID): Clean-air offset removal + ideal-gas `T/P` density correction (isobutylene equivalent).
   - **DSP:** MAD first-difference live noise estimation, Hampel spike filter, and 1D random-walk Kalman smoothing.
 

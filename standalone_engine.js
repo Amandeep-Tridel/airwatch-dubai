@@ -1,11 +1,13 @@
-/* AirWatch Dubai — Standalone Browser Telemetry + Alphasense Physics Engine (v6.1)
+/* AirWatch Dubai — Standalone Browser Telemetry + Alphasense Physics Engine (v6.2)
  * Runs 100% client-side on GitHub Pages (or any static host) when /api/live is absent.
  * Connects directly to:
  *   1. Firebase RTDB: https://aqms-65300-default-rtdb.firebaseio.com/data.json
  *   2. Open-Meteo Dubai: https://api.open-meteo.com/v1/forecast (hourly + live weather)
- * Implements the exact same Alphasense datasheet conversions (H2S-B4 AAN 803 Alg 1,
- * NH3-B1 3-electrode + H2S t90 cross-sensitivity, PIDX-A-040 ideal-gas T/P density)
- * and Hampel + 1D Kalman DSP pipeline as algo_engine.py.
+ * Implements the exact Alphasense conversions:
+ *   - H2S-B4 (A1/A2): AAN 803 Alg 1
+ *   - NH3-B1+ (A0, barcode 77840031): ((A0_V * 1000) - 328) / 58.624 (73.28 nA/ppm * 0.8 mV/nA)
+ *   - PIDX-A-040 (A3): clean-air zero + ideal-gas T/P density
+ * plus Hampel + 1D Kalman DSP smoothing and 10m / 20m / 30m rolling averages.
  */
 (() => {
   "use strict";
@@ -22,13 +24,13 @@
   const ALARM_CODE = { NORMAL: 0, WARNING: 1, ACTION: 2, CRITICAL: 3 };
 
   const CONFIG = {
-    algo_version: "v5.1-web (Alphasense datasheets + AAN 803 n_T, live browser engine)",
+    algo_version: "v5.2-web (NH3-B1+ 77840031 factory cal + Alphasense AAN 803)",
     calibration_verified: false,
     sensors_prewarmed: true,
     enforce_lod: false,
     power_gap_reset_s: 15 * 60,
     calibration_note:
-      "PROVISIONAL. Zeros estimated from clean-air baseline (2026-10-28). Sensitivities are nominal datasheet values. Replace with Alphasense certificate values + carbon-bag zero test when available.",
+      "NH3-B1+ (barcode 77840031) uses Alphasense factory sheet calibration: WE_0 = 328 mV, sensitivity = 73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm (+200 mV biased 3-electrode ISB). H2S-B4 and PIDX-A-040 remain on provisional clean-air baselines pending certificate values.",
     h2s: {
       we_e_mv: 589.0,
       ae_e_mv: 302.0,
@@ -40,15 +42,16 @@
       sens_tc: [[-30, 0.75], [-20, 0.835], [-10, 0.88], [0, 0.92], [10, 0.96], [20, 1.0], [30, 1.03], [40, 1.055], [50, 1.05]],
     },
     nh3: {
-      we_e_mv: 405.9,
-      sens_mv_per_ppm: 65.0,
-      sens_rel_uncertainty: 0.5,
-      zero_uncertainty_ppm: 10.0,
+      serial: "NH3-B1+ (77840031)",
+      we_e_mv: 328.0,
+      sens_na_per_ppm: 73.28,
+      board_gain_mv_per_na: 0.8,
+      sens_mv_per_ppm: 58.624,
+      sens_rel_uncertainty: 0.05,
+      zero_uncertainty_mv: 2.0,
+      zero_uncertainty_ppm: 2.0 / 58.624,
       noise_mv_default: 4.0,
-      xs_h2s: -2.0,
-      t90_match_alpha: 0.63,
       event_threshold_mv: 30.0,
-      sens_tc: [[-30, 0.8], [-20, 0.84], [-10, 0.88], [0, 0.92], [10, 0.96], [20, 1.0], [30, 1.04], [40, 1.08], [50, 1.12]],
     },
     voc: {
       v_zero_mv: 95.5,
@@ -325,7 +328,7 @@
       if (Array.isArray(rv) && rv.length >= 4 && rv.every((x) => Number.isFinite(x))) {
         [nh3Mv, weMv, aeMv, vocMv] = rv.map((v) => v * 1000.0);
       } else {
-        nh3Mv = countsToMv(p.nh3_we_counts);
+        nh3Mv = (p.nh3_we_counts / 32768.0) * 2560.0;
         weMv = countsToMv(p.h2s_we_counts);
         aeMv = countsToMv(p.h2s_ae_counts);
         vocMv = countsToMv(p.voc_counts);
@@ -384,16 +387,10 @@
       const h2sPpb = weC / h2sSens;
       const h2sPpm = h2sPpb / 1000.0;
 
-      const alpha = CONFIG.nh3.t90_match_alpha;
-      this.h2sT90 = this.h2sT90 === null ? h2sPpm : alpha * h2sPpm + (1 - alpha) * this.h2sT90;
-      const h2sForNh3 = Math.max(0.0, this.h2sT90);
-
-      // 2. NH3-B1 (3-electrode + H2S cross-sensitivity matching gas_algo/nh3_b1.py)
-      const nh3U = countsToMv(p.nh3_we_counts);
-      const nh3Sens = CONFIG.nh3.sens_mv_per_ppm * interp(CONFIG.nh3.sens_tc, tC);
-      const nh3Apparent = (nh3U - CONFIG.nh3.we_e_mv) / nh3Sens;
-      const nh3Corr = CONFIG.nh3.xs_h2s * h2sForNh3;
-      const nh3Ppm = nh3Apparent - nh3Corr;
+      // 2. NH3-B1+ (barcode 77840031, Alphasense factory calibration sheet:
+      //    WE_0 = 328 mV, sensitivity = 73.28 nA/ppm * 0.8 mV/nA = 58.624 mV/ppm, +200 mV biased 3-electrode ISB)
+      //    NH3_ppm = ((A0_in_volts * 1000) - 328) / 58.624
+      const nh3Ppm = (nh3Mv - CONFIG.nh3.we_e_mv) / CONFIG.nh3.sens_mv_per_ppm;
 
       // 3. PIDX-A-040 (clean-air zero + ideal-gas T/P density matching gas_algo/pidx_a040.py)
       const vocUMv = countsToMv(p.voc_counts);
@@ -444,7 +441,7 @@
           lod_ppm: 0,
           noise_ppm: Number(noisePpm[g].toFixed(5)),
           zero_uncertainty_ppm: Number(zeroUncPpm[g].toFixed(5)),
-          status: "INDICATIVE",
+          status: g === "nh3" ? "QUANTITATIVE" : "INDICATIVE",
           trend: trend[g],
           ugm3: Number(((filt[g] * 1000.0 * mw[g]) / 24.465).toFixed(2)),
         };
@@ -467,7 +464,10 @@
       const baseFlags = "CAL_PROVISIONAL|TEMP_FROM_WEATHER_API" + (batteryDip ? "|SUPPLY_DIP" : "");
       const qc = {
         h2s_flags: "COEFF_UNVERIFIED|" + baseFlags,
-        nh3_flags: "TC_UNCHARACTERISED|" + baseFlags + (nh3Event ? "|NH3_EVENT" : ""),
+        nh3_flags:
+          "CAL_FACTORY_77840031" +
+          (batteryDip ? "|SUPPLY_DIP" : "") +
+          (nh3Event ? "|NH3_EVENT" : ""),
         voc_flags: "BASELINE_UNTRACKED|" + baseFlags,
       };
 

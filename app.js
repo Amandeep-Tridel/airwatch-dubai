@@ -15,7 +15,7 @@
   const GAS = {
     h2s: { name: "Hydrogen sulfide", formula: "H₂S", color: "--h2s", dec: { ppm: 3, ppb: 0 },
            desc: "Rotten-egg smell. From sewage, landfill and industry." },
-    nh3: { name: "Ammonia", formula: "NH₃", color: "--nh3", dec: { ppm: 2, ppb: 0 },
+    nh3: { name: "Ammonia", formula: "NH₃", color: "--nh3", dec: { ppm: 3, ppb: 0 },
            desc: "Sharp smell. From waste, agriculture and cleaning agents." },
     voc: { name: "Volatile organics", formula: "VOC", color: "--voc", dec: { ppm: 3, ppb: 0 },
            desc: "Fuel vapour, solvents and traffic (isobutylene equivalent)." },

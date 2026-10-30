@@ -6,7 +6,7 @@
   <title>AirWatch Dubai — Live Air Quality</title>
   <meta name="description" content="Live hydrogen sulfide, ammonia and VOC readings from the AQMS station in Dubai." />
   <link rel="stylesheet" href="./vendor/uPlot.min.css" />
-  <link rel="stylesheet" href="./app.css?v=12" />
+  <link rel="stylesheet" href="./app.css?v=13" />
   <script>
     // Apply saved/system theme before paint to avoid a flash
     (function () {
@@ -171,7 +171,7 @@
         <h3>How the numbers are made</h3>
         <ul class="method">
           <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary electrode): AAN 803 algorithm 1, <code>[(A1−WE_e) − n_T·(A2−AE_e)] / sensitivity</code>.</li>
-          <li><strong>NH₃</strong> (Alphasense NH3-B1, A0): 3-electrode conversion with H₂S cross-sensitivity compensation.</li>
+          <li><strong>NH₃</strong> (Alphasense NH₃-B1+, barcode <code>77840031</code>, A0 working electrode): factory sheet conversion <code>[(A0_V × 1000) − 328] / 58.624</code> (<code>WE₀ = 328 mV</code>, <code>73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm</code>, +200 mV biased 3-electrode ISB).</li>
           <li><strong>VOC</strong> (Alphasense PIDX-A-040, A3): fixed clean-air zero plus ideal-gas temperature/pressure correction, reported as isobutylene equivalent.</li>
           <li>Values are despiked and smoothed with a Hampel + 1D Kalman filter, with live 1σ noise estimates reported alongside every reading.</li>
         </ul>
@@ -191,7 +191,7 @@
   <div id="tip" class="tip" role="tooltip" hidden></div>
 
   <script src="./vendor/uPlot.iife.min.js"></script>
-  <script src="./standalone_engine.js?v=12"></script>
-  <script src="./app.js?v=12"></script>
+  <script src="./standalone_engine.js?v=13"></script>
+  <script src="./app.js?v=13"></script>
 </body>
 </html>

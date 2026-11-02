@@ -1,13 +1,17 @@
-/* AirWatch Dubai — Standalone Browser Telemetry + Alphasense Physics Engine (v6.2)
+/* AirWatch Dubai — Standalone Browser Telemetry Engine (v7.0, factory calibration only)
  * Runs 100% client-side on GitHub Pages (or any static host) when /api/live is absent.
  * Connects directly to:
  *   1. Firebase RTDB: https://aqms-65300-default-rtdb.firebaseio.com/data.json
- *   2. Open-Meteo Dubai: https://api.open-meteo.com/v1/forecast (hourly + live weather)
- * Implements the exact Alphasense conversions:
- *   - H2S-B4 (A1/A2): AAN 803 Alg 1
- *   - NH3-B1+ (A0, barcode 77840031): ((A0_V * 1000) - 328) / 58.624 (73.28 nA/ppm * 0.8 mV/nA)
- *   - PIDX-A-040 (A3): clean-air zero + ideal-gas T/P density
- * plus Hampel + 1D Kalman DSP smoothing and 10m / 20m / 30m rolling averages.
+ *   2. Open-Meteo Dubai (weather panel only; not used in any formula)
+ *
+ * Each gas value uses ONLY the zero and sensitivity printed on the sensor's Alphasense
+ * factory calibration sheet:
+ *   H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity   (AAN 803-05 Alg. 3, k'T = 1)
+ *   NH3 (ppm) = (A0 - WE zero) / sensitivity                       (sheet 77840031: (mV - 328) / 58.624)
+ *   VOC (ppm) = (A3 - V zero) / sensitivity                        (AAN 302-04, no temperature correction)
+ * No spike filter, no smoothing, no noise models, no temperature tables, no clamping.
+ * A gas without a factory sheet shows no number ("NO_CALIBRATION"); its raw voltage is still shown.
+ * 10 / 20 / 30-minute values are plain averages; alarm levels use the 10-minute average.
  */
 (() => {
   "use strict";
@@ -20,57 +24,25 @@
     "&past_days=2&forecast_days=1&wind_speed_unit=ms&timezone=UTC";
 
   const GASES = ["h2s", "nh3", "voc"];
-  const STATUS_CODE = { WARMUP: 0, BELOW_LOD: 1, INDICATIVE: 2, QUANTITATIVE: 3 };
+  const STATUS_CODE = { FACTORY_CAL: 3, NO_CALIBRATION: 4 };
   const ALARM_CODE = { NORMAL: 0, WARNING: 1, ACTION: 2, CRITICAL: 3 };
 
+  // Factory calibration sheets. Fill a gas's null values from its Alphasense factory
+  // calibration sheet to switch it on. Never use values that are not on the sheet.
+  const FACTORY = {
+    h2s: { sensor: "H2S-B4", serial: null, we_zero_mv: null, ae_zero_mv: null, sensitivity: null }, // mV/ppb
+    nh3: { sensor: "NH3-B1+", serial: "77840031", we_zero_mv: 328.0, sensitivity: 58.624 },         // mV/ppm
+    voc: { sensor: "PIDX-A-040", serial: null, we_zero_mv: null, sensitivity: null },               // mV/ppm
+  };
+
   const CONFIG = {
-    algo_version: "v5.2-web (NH3-B1+ 77840031 factory cal + Alphasense AAN 803)",
-    calibration_verified: false,
-    sensors_prewarmed: true,
-    enforce_lod: false,
+    algo_version: "v7.0-web (Alphasense factory calibration only)",
     power_gap_reset_s: 15 * 60,
     calibration_note:
-      "NH3-B1+ (barcode 77840031) uses Alphasense factory sheet calibration: WE_0 = 328 mV, sensitivity = 73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm (+200 mV biased 3-electrode ISB). H2S-B4 and PIDX-A-040 remain on provisional clean-air baselines pending certificate values.",
-    h2s: {
-      we_e_mv: 589.0,
-      ae_e_mv: 302.0,
-      sens_mv_per_ppb: 0.73,
-      sens_rel_uncertainty: 0.4,
-      zero_uncertainty_mv: 12.0,
-      noise_mv_default: 4.9,
-      n_t: [[-30, -0.6], [-20, -0.6], [-10, 0.1], [0, 0.8], [10, -0.7], [20, -2.5], [30, -2.5], [40, -2.2], [50, -1.8]],
-      sens_tc: [[-30, 0.75], [-20, 0.835], [-10, 0.88], [0, 0.92], [10, 0.96], [20, 1.0], [30, 1.03], [40, 1.055], [50, 1.05]],
-    },
-    nh3: {
-      serial: "NH3-B1+ (77840031)",
-      we_e_mv: 328.0,
-      sens_na_per_ppm: 73.28,
-      board_gain_mv_per_na: 0.8,
-      sens_mv_per_ppm: 58.624,
-      sens_rel_uncertainty: 0.05,
-      zero_uncertainty_mv: 2.0,
-      zero_uncertainty_ppm: 2.0 / 58.624,
-      noise_mv_default: 4.0,
-      event_threshold_mv: 30.0,
-    },
-    voc: {
-      v_zero_mv: 95.5,
-      mv_per_ppm: 55.0,
-      sens_rel_uncertainty: 0.1,
-      zero_uncertainty_mv: 5.0,
-      noise_mv_default: 1.2,
-      t_cal_c: 25.0,
-      p_cal_hpa: 1013.25,
-      response_factor: 1.0,
-    },
-    dsp: {
-      hampel_window: 9,
-      hampel_n_sigma: 3.5,
-      kalman_q_over_r: 0.05,
-      noise_window: 60,
-      trend_window: 10,
-      rolling_window_sec: 600,
-    },
+      "Factory calibration only. Each gas uses only the zero and sensitivity printed on its Alphasense " +
+      "factory calibration sheet. NH₃-B1+ (sheet 77840031): (A0 mV − 328) / 58.624 ppm, where " +
+      "58.624 mV/ppm = 73.28 nA/ppm × 0.8 mV/nA. H₂S-B4 and PIDX-A-040 show no value until their " +
+      "factory sheets are entered. No filtering, smoothing or temperature tables are applied.",
     thresholds: {
       h2s_ppm: { warning: 0.5, action: 1.5, critical: 5.0 },
       nh3_ppm: { warning: 5.0, action: 15.0, critical: 35.0 },
@@ -78,53 +50,37 @@
     },
   };
 
-  // ------------------------------------------------------------------ math helpers
-  function median(arr) {
-    if (!arr.length) return 0;
-    const s = [...arr].sort((a, b) => a - b);
-    const m = s.length >> 1;
-    return s.length % 2 ? s[m] : 0.5 * (s[m - 1] + s[m]);
+  // ------------------------------------------------------------------ factory formulas
+  const countsToMv = (counts) => (counts * 2560.0) / 32768.0;
+  const h2sPpb = (we, weZero, ae, aeZero, sens) => ((we - weZero) - (ae - aeZero)) / sens;
+  const nh3Ppm = (we, weZero, sens) => (we - weZero) / sens;
+  const vocPpm = (v, vZero, sens) => (v - vZero) / sens;
+
+  function factory(gas) {
+    const f = FACTORY[gas];
+    const need = gas === "h2s" ? ["we_zero_mv", "ae_zero_mv", "sensitivity"] : ["we_zero_mv", "sensitivity"];
+    return need.every((k) => Number.isFinite(f[k])) ? f : null;
   }
 
-  function mean(arr) {
-    if (!arr.length) return 0;
-    let sum = 0;
-    for (let i = 0; i < arr.length; i++) sum += arr[i];
-    return sum / arr.length;
+  function calibrationLabel(gas) {
+    const f = factory(gas);
+    if (!f) return "No factory calibration sheet entered";
+    const sheet = `Alphasense factory sheet ${f.serial || ""}`.trim();
+    if (gas === "h2s") return `${sheet}: ((A1 − ${f.we_zero_mv}) − (A2 − ${f.ae_zero_mv})) / ${f.sensitivity} ppb`;
+    return `${sheet}: (${gas === "nh3" ? "A0" : "A3"} mV − ${f.we_zero_mv}) / ${f.sensitivity}`;
   }
 
-  function interp(pairs, t) {
-    if (t <= pairs[0][0]) return pairs[0][1];
-    const last = pairs[pairs.length - 1];
-    if (t >= last[0]) return last[1];
-    for (let i = 1; i < pairs.length; i++) {
-      const [x1, y1] = pairs[i];
-      if (t <= x1) {
-        const [x0, y0] = pairs[i - 1];
-        if (x1 === x0) return y0;
-        return y0 + ((t - x0) / (x1 - x0)) * (y1 - y0);
-      }
-    }
-    return last[1];
-  }
-
-  function robustNoise(values) {
-    if (values.length < 20) return null;
-    const diffs = [];
-    for (let i = 1; i < values.length; i++) diffs.push(values[i] - values[i - 1]);
-    const med = median(diffs);
-    const mad = median(diffs.map((d) => Math.abs(d - med)));
-    return (1.4826 * mad) / Math.SQRT2;
-  }
-
+  // ------------------------------------------------------------------ helpers
   function parseIsoUnix(tsStr) {
     if (!tsStr) return null;
     const ms = Date.parse(tsStr);
     return Number.isFinite(ms) ? ms / 1000 : null;
   }
+  const round = (x, n = 5) => (x == null ? null : Number(x.toFixed(n)));
 
-  function countsToMv(counts) {
-    return (counts / 32767.0) * 2560.0;
+  function pushBounded(arr, val, maxLen) {
+    arr.push(val);
+    if (arr.length > maxLen) arr.shift();
   }
 
   // ------------------------------------------------------------------ parser (v3 + v4)
@@ -197,6 +153,7 @@
       sample_age_ms: rec.sampleAgeMs != null ? Number(rec.sampleAgeMs) : null,
       adc_ok: rec.adcOk !== false,
       stm32_status: stm32Status,
+      // Weather: shown on the dashboard only, never used in a formula.
       head_t_c: Number(w.temp_c ?? 28.0),
       rh_pct: Number(w.rh_pct ?? 60.0),
       p_hpa: Number(w.press_hpa ?? 1013.25),
@@ -206,37 +163,7 @@
     };
   }
 
-  // ------------------------------------------------------------------ engine state
-  class Kalman1D {
-    constructor(qOverR) {
-      this.qOverR = qOverR;
-      this.x = null;
-      this.p = 0;
-    }
-    reset() {
-      this.x = null;
-      this.p = 0;
-    }
-    update(z, r, rMult = 1.0) {
-      const rEff = Math.max(1e-18, r * rMult);
-      if (this.x === null) {
-        this.x = z;
-        this.p = rEff;
-        return z;
-      }
-      const pPred = this.p + this.qOverR * r;
-      const k = pPred / (pPred + rEff);
-      this.x = this.x + k * (z - this.x);
-      this.p = (1 - k) * pPred;
-      return this.x;
-    }
-  }
-
-  function pushBounded(arr, val, maxLen) {
-    arr.push(val);
-    if (arr.length > maxLen) arr.shift();
-  }
-
+  // ------------------------------------------------------------------ engine
   class BrowserAQMSHub {
     constructor() {
       this.resetEngine();
@@ -252,66 +179,18 @@
       this.firebaseLatencyMs = 0;
       this.firebaseBytesLast = 0;
       this.firebaseError = null;
-      this._initPromise = null;
     }
 
     resetEngine() {
-      const d = CONFIG.dsp;
-      this.hampel = { h2s: [], nh3: [], voc: [] };
-      this.kalman = {
-        h2s: new Kalman1D(d.kalman_q_over_r),
-        nh3: new Kalman1D(d.kalman_q_over_r),
-        voc: new Kalman1D(d.kalman_q_over_r),
-      };
-      this.filteredHist = { h2s: [], nh3: [], voc: [] };
-      this.signalMv = { h2s: [], nh3: [], voc: [] };
       this.rollingBuf = []; // [{ ts, h2s, nh3, voc }] up to 30 min (1800 s)
-      this.batteryHist = [];
       this.powerOnUnix = null;
       this.lastSampleUnix = null;
-      this.h2sT90 = null;
       this.packets = 0;
-      this.spikes = 0;
-      this.batteryDips = 0;
-      this.samplesFiltered = 0;
       this.history = [];
     }
 
-    _noiseMv(gas) {
-      const live = robustNoise(this.signalMv[gas]);
-      return live !== null && live > 0 ? live : CONFIG[gas].noise_mv_default;
-    }
-
-    _despike(gas, x, noisePpm) {
-      const buf = this.hampel[gas];
-      let spike = false, out = x;
-      if (buf.length >= 5) {
-        const med = median(buf);
-        const madSigma = 1.4826 * median(buf.map((b) => Math.abs(b - med)));
-        const sigma = Math.max(madSigma, noisePpm);
-        if (Math.abs(x - med) > CONFIG.dsp.hampel_n_sigma * sigma) {
-          out = med;
-          spike = true;
-          this.spikes++;
-        }
-      }
-      pushBounded(buf, x, CONFIG.dsp.hampel_window);
-      return [out, spike];
-    }
-
-    _trend(gas, filtered, noisePpm) {
-      const h = this.filteredHist[gas];
-      const w = CONFIG.dsp.trend_window;
-      pushBounded(h, filtered, 2 * w);
-      if (h.length < 2 * w) return "STABLE";
-      const delta = mean(h.slice(w)) - mean(h.slice(0, w));
-      const thresh = 3.0 * noisePpm * Math.sqrt(2.0 / w);
-      if (delta > thresh) return "RISING";
-      if (delta < -thresh) return "FALLING";
-      return "STABLE";
-    }
-
     _alarm(key, val) {
+      if (val == null) return "NORMAL";
       const th = CONFIG.thresholds[key] || {};
       if (th.critical != null && val >= th.critical) return "CRITICAL";
       if (th.action != null && val >= th.action) return "ACTION";
@@ -321,172 +200,90 @@
 
     process(p) {
       this.packets++;
-      const tC = p.head_t_c, rh = p.rh_pct, pHpa = p.p_hpa;
 
+      // Voltages: exact reported volts when present, else ADC counts.
       const rv = p.reported_volts;
       let nh3Mv, weMv, aeMv, vocMv;
       if (Array.isArray(rv) && rv.length >= 4 && rv.every((x) => Number.isFinite(x))) {
         [nh3Mv, weMv, aeMv, vocMv] = rv.map((v) => v * 1000.0);
       } else {
-        nh3Mv = (p.nh3_we_counts / 32768.0) * 2560.0;
-        weMv = countsToMv(p.h2s_we_counts);
-        aeMv = countsToMv(p.h2s_ae_counts);
-        vocMv = countsToMv(p.voc_counts);
+        [nh3Mv, weMv, aeMv, vocMv] = [p.nh3_we_counts, p.h2s_we_counts, p.h2s_ae_counts, p.voc_counts].map(countsToMv);
       }
 
+      // Uptime (display only).
       const tsUnix = parseIsoUnix(p.ts) || Date.now() / 1000;
       const gap = this.lastSampleUnix !== null && tsUnix - this.lastSampleUnix > CONFIG.power_gap_reset_s;
       if (this.powerOnUnix === null || gap) {
         this.powerOnUnix = tsUnix;
-        if (gap) {
-          for (const g of GASES) {
-            this.kalman[g].reset();
-            this.hampel[g] = [];
-            this.filteredHist[g] = [];
-            this.signalMv[g] = [];
-          }
-          this.rollingBuf = [];
-          this.h2sT90 = null;
-        }
+        if (gap) this.rollingBuf = [];
       }
       this.lastSampleUnix = tsUnix;
-      const uptimeMin = (tsUnix - this.powerOnUnix) / 60.0;
 
-      let batteryDip = false;
-      if (p.battery_v !== null && Number.isFinite(p.battery_v)) {
-        if (this.batteryHist.length >= 3 && p.battery_v < median(this.batteryHist) - 0.025) {
-          batteryDip = true;
-          this.batteryDips++;
-        }
-        pushBounded(this.batteryHist, p.battery_v, 30);
-      }
-      const rMult = batteryDip ? 3.5 : 1.0;
-
-      pushBounded(this.signalMv.h2s, weMv - aeMv, CONFIG.dsp.noise_window);
-      pushBounded(this.signalMv.nh3, nh3Mv, CONFIG.dsp.noise_window);
-      pushBounded(this.signalMv.voc, vocMv, CONFIG.dsp.noise_window);
-
-      const h2sSensPpm = CONFIG.h2s.sens_mv_per_ppb * 1000.0;
-      const noisePpm = {
-        h2s: this._noiseMv("h2s") / h2sSensPpm,
-        nh3: this._noiseMv("nh3") / CONFIG.nh3.sens_mv_per_ppm,
-        voc: this._noiseMv("voc") / CONFIG.voc.mv_per_ppm,
-      };
-      const zeroUncPpm = {
-        h2s: CONFIG.h2s.zero_uncertainty_mv / h2sSensPpm,
-        nh3: CONFIG.nh3.zero_uncertainty_ppm,
-        voc: CONFIG.voc.zero_uncertainty_mv / CONFIG.voc.mv_per_ppm,
+      // The three factory formulas. No factory sheet -> no number.
+      const fH = factory("h2s"), fN = factory("nh3"), fV = factory("voc");
+      const vocFault = !!fV && vocMv < fV.we_zero_mv;
+      const value = {
+        h2s: fH ? h2sPpb(weMv, fH.we_zero_mv, aeMv, fH.ae_zero_mv, fH.sensitivity) / 1000.0 : null,
+        nh3: fN ? nh3Ppm(nh3Mv, fN.we_zero_mv, fN.sensitivity) : null,
+        voc: fV && !vocFault ? vocPpm(vocMv, fV.we_zero_mv, fV.sensitivity) : null,
       };
 
-      // 1. H2S-B4 (AAN 803 Algorithm 1, counts_to_mv matching gas_algo/h2s_b4.py)
-      const weU = countsToMv(p.h2s_we_counts);
-      const aeU = countsToMv(p.h2s_ae_counts);
-      const nT = interp(CONFIG.h2s.n_t, tC);
-      const weC = (weU - CONFIG.h2s.we_e_mv) - nT * (aeU - CONFIG.h2s.ae_e_mv);
-      const h2sSens = CONFIG.h2s.sens_mv_per_ppb * interp(CONFIG.h2s.sens_tc, tC);
-      const h2sPpb = weC / h2sSens;
-      const h2sPpm = h2sPpb / 1000.0;
-
-      // 2. NH3-B1+ (barcode 77840031, Alphasense factory calibration sheet:
-      //    WE_0 = 328 mV, sensitivity = 73.28 nA/ppm * 0.8 mV/nA = 58.624 mV/ppm, +200 mV biased 3-electrode ISB)
-      //    NH3_ppm = ((A0_in_volts * 1000) - 328) / 58.624
-      const nh3Ppm = (nh3Mv - CONFIG.nh3.we_e_mv) / CONFIG.nh3.sens_mv_per_ppm;
-
-      // 3. PIDX-A-040 (clean-air zero + ideal-gas T/P density matching gas_algo/pidx_a040.py)
-      const vocUMv = countsToMv(p.voc_counts);
-      const density = ((tC + 273.15) / (CONFIG.voc.t_cal_c + 273.15)) * (CONFIG.voc.p_cal_hpa / pHpa);
-      const vocPpm = ((vocUMv - CONFIG.voc.v_zero_mv) / CONFIG.voc.mv_per_ppm) * density * CONFIG.voc.response_factor;
-
-      const sample = { h2s: h2sPpm, nh3: nh3Ppm, voc: vocPpm };
-      const filt = {}, trend = {};
-      let spikeFrame = false;
-      for (const g of GASES) {
-        const [x, spk] = this._despike(g, sample[g], noisePpm[g]);
-        if (spk) spikeFrame = true;
-        filt[g] = this.kalman[g].update(x, noisePpm[g] ** 2, rMult * (spk ? 4.0 : 1.0));
-        trend[g] = this._trend(g, filt[g], noisePpm[g]);
-      }
-      if (spikeFrame) this.samplesFiltered++;
-
-      // Timestamp-windowed rolling averages: 10 min (600 s), 20 min (1200 s), 30 min (1800 s)
-      this.rollingBuf.push({ ts: tsUnix, h2s: filt.h2s, nh3: filt.nh3, voc: filt.voc });
-      while (this.rollingBuf.length && this.rollingBuf[0].ts < tsUnix - 1800) {
-        this.rollingBuf.shift();
-      }
+      // Plain 10 / 20 / 30-minute averages of the readings in each window.
+      this.rollingBuf.push({ ts: tsUnix, ...value });
+      while (this.rollingBuf.length && this.rollingBuf[0].ts < tsUnix - 1800) this.rollingBuf.shift();
       const winMean = (sec, gas) => {
-        const cut = tsUnix - sec;
         let s = 0, c = 0;
-        for (let i = this.rollingBuf.length - 1; i >= 0; i--) {
-          if (this.rollingBuf[i].ts < cut) break;
-          s += this.rollingBuf[i][gas];
-          c++;
+        for (const r of this.rollingBuf) {
+          if (r.ts >= tsUnix - sec && r[gas] != null) { s += r[gas]; c++; }
         }
-        return c > 0 ? s / c : filt[gas];
+        return c > 0 ? s / c : null;
       };
 
-      const mw = { h2s: 34.081, nh3: 17.031, voc: 56.106 };
+      const signal = {
+        h2s: `A1 WE ${weMv.toFixed(2)} mV · A2 AE ${aeMv.toFixed(2)} mV`,
+        nh3: `A0 ${nh3Mv.toFixed(2)} mV`,
+        voc: `A3 ${vocMv.toFixed(2)} mV`,
+      };
       const report = {};
       for (const g of GASES) {
-        const filtSigma = Math.sqrt(Math.max(this.kalman[g].p, 0));
-        const sRel = CONFIG[g].sens_rel_uncertainty;
-        const unc = Math.sqrt(zeroUncPpm[g] ** 2 + filtSigma ** 2 + (sRel * filt[g]) ** 2);
-        const r10 = winMean(600, g), r20 = winMean(1200, g), r30 = winMean(1800, g);
         report[g] = {
-          value_ppm: Number(filt[g].toFixed(5)),
-          sample_ppm: Number(sample[g].toFixed(5)),
-          avg_10m_ppm: Number(r10.toFixed(5)),
-          avg_20m_ppm: Number(r20.toFixed(5)),
-          avg_30m_ppm: Number(r30.toFixed(5)),
-          uncertainty_ppm: Number(unc.toFixed(5)),
-          lod_ppm: 0,
-          noise_ppm: Number(noisePpm[g].toFixed(5)),
-          zero_uncertainty_ppm: Number(zeroUncPpm[g].toFixed(5)),
-          status: g === "nh3" ? "QUANTITATIVE" : "INDICATIVE",
-          trend: trend[g],
-          ugm3: Number(((filt[g] * 1000.0 * mw[g]) / 24.465).toFixed(2)),
+          value_ppm: round(value[g]),
+          sample_ppm: round(value[g]),
+          avg_10m_ppm: round(winMean(600, g)),
+          avg_20m_ppm: round(winMean(1200, g)),
+          avg_30m_ppm: round(winMean(1800, g)),
+          status: factory(g) ? "FACTORY_CAL" : "NO_CALIBRATION",
+          calibration: calibrationLabel(g),
+          signal: signal[g],
         };
       }
-      const nh3FiltDeltaMv = filt.nh3 * CONFIG.nh3.sens_mv_per_ppm;
-      const nh3Event = nh3FiltDeltaMv > Math.max(CONFIG.nh3.event_threshold_mv, 5.0 * this._noiseMv("nh3"));
-      report.nh3.event = nh3Event;
-      report.nh3.signal_above_zero_mv = Number((nh3Mv - CONFIG.nh3.we_e_mv).toFixed(2));
 
-      const alarms = {
-        h2s: this._alarm("h2s_ppm", filt.h2s),
-        nh3: this._alarm("nh3_ppm", filt.nh3),
-        voc: this._alarm("voc_ppm", filt.voc),
-      };
-      alarms.overall = ["h2s", "nh3", "voc"].reduce(
-        (best, g) => (ALARM_CODE[alarms[g]] > ALARM_CODE[best] ? alarms[g] : best),
-        "NORMAL"
-      );
+      const alarms = {};
+      for (const g of GASES) alarms[g] = this._alarm(`${g}_ppm`, report[g].avg_10m_ppm);
+      alarms.overall = GASES.reduce((best, g) => (ALARM_CODE[alarms[g]] > ALARM_CODE[best] ? alarms[g] : best), "NORMAL");
 
-      const baseFlags = "CAL_PROVISIONAL|TEMP_FROM_WEATHER_API" + (batteryDip ? "|SUPPLY_DIP" : "");
-      const qc = {
-        h2s_flags: "COEFF_UNVERIFIED|" + baseFlags,
-        nh3_flags:
-          "CAL_FACTORY_77840031" +
-          (batteryDip ? "|SUPPLY_DIP" : "") +
-          (nh3Event ? "|NH3_EVENT" : ""),
-        voc_flags: "BASELINE_UNTRACKED|" + baseFlags,
+      const flags = (g) => {
+        const f = factory(g);
+        if (!f) return "NO_FACTORY_CALIBRATION";
+        return `FACTORY_CAL_${f.serial || "SHEET"}` + (g === "voc" && vocFault ? "|SENSOR_FAULT_BELOW_ZERO" : "");
       };
+      const calibrated = GASES.filter((g) => factory(g)).map((g) => g.toUpperCase());
 
       const recOut = {
         ts: p.ts,
         ts_unix: tsUnix,
         firebase_key: p.firebase_key,
         station_id: p.station_id,
-        uptime_min: Number(uptimeMin.toFixed(1)),
-        calibration_verified: false,
+        uptime_min: Number(((tsUnix - this.powerOnUnix) / 60.0).toFixed(1)),
+        calibration_label: calibrated.length ? `Factory sheet (${calibrated.join(", ")} only)` : "No factory sheets",
         algo_version: CONFIG.algo_version,
         raw_string: p.raw_string,
         weather_source: p.weather_source,
         report,
         alarms,
-        qc,
+        qc: { h2s_flags: flags("h2s"), nh3_flags: flags("nh3"), voc_flags: flags("voc") },
         hardware: {
           battery_v: p.battery_v,
-          battery_dip_detected: batteryDip,
           h2s_diff_v: Number(((weMv - aeMv) / 1000.0).toFixed(5)),
           sample_age_ms: p.sample_age_ms,
           adc_ok: p.adc_ok,
@@ -497,16 +294,11 @@
           h2s_we_mv: Number(weMv.toFixed(3)),
           h2s_ae_mv: Number(aeMv.toFixed(3)),
           voc_mv: Number(vocMv.toFixed(3)),
-          head_t_c: Number(tC.toFixed(2)),
-          rh_pct: Number(rh.toFixed(2)),
-          p_hpa: Number(pHpa.toFixed(2)),
+          head_t_c: Number(p.head_t_c.toFixed(2)),
+          rh_pct: Number(p.rh_pct.toFixed(2)),
+          p_hpa: Number(p.p_hpa.toFixed(2)),
           wind_speed_ms: Number(p.wind_speed_ms.toFixed(2)),
           wind_dir_deg: Number(p.wind_dir_deg.toFixed(1)),
-        },
-        dsp: {
-          spike_rate_pct: Number(((100.0 * this.spikes) / (3 * this.packets)).toFixed(2)),
-          battery_dips_total: this.batteryDips,
-          spikes_rejected_total: this.spikes,
         },
       };
       pushBounded(this.history, recOut, 1440);
@@ -567,8 +359,7 @@
             if (this.lastKey !== null && key <= this.lastKey) continue;
             const rec = records[key];
             if (rec && typeof rec === "object" && (rec.combinedString || rec.raw)) {
-              const parsed = parseRecord(key, rec, this.weather.by_hour, this.weather);
-              this.process(parsed);
+              this.process(parseRecord(key, rec, this.weather.by_hour, this.weather));
             }
             this.lastKey = key;
           }
@@ -607,7 +398,7 @@
               ts_unix: r.ts_unix,
               station_id: r.station_id,
               uptime_min: r.uptime_min,
-              calibration_verified: false,
+              calibration_label: r.calibration_label,
               gases: {
                 h2s: { ...r.report.h2s, alarm: r.alarms.h2s, flags: r.qc.h2s_flags },
                 nh3: { ...r.report.nh3, alarm: r.alarms.nh3, flags: r.qc.nh3_flags },
@@ -623,7 +414,6 @@
                 source: r.weather_source,
               },
               hardware: r.hardware,
-              dsp: r.dsp,
             }
           : null,
       };
@@ -643,12 +433,10 @@
           r10: rows.map((r) => r.report[g].avg_10m_ppm),
           r20: rows.map((r) => r.report[g].avg_20m_ppm),
           r30: rows.map((r) => r.report[g].avg_30m_ppm),
-          lod: rows.map(() => 0),
-          st: rows.map((r) => STATUS_CODE[r.report[g].status] ?? 2),
+          st: rows.map((r) => STATUS_CODE[r.report[g].status] ?? 4),
           al: rows.map((r) => ALARM_CODE[r.alarms[g]] ?? 0),
         };
       }
-      out.nh3.ev = rows.map((r) => (r.report.nh3.event ? 1 : 0));
       out.temp = rows.map((r) => r.raw.head_t_c);
       out.rh = rows.map((r) => r.raw.rh_pct);
       out.batt = rows.map((r) => r.hardware.battery_v);
@@ -682,6 +470,7 @@
         "h2s_ppm", "h2s_10m_ppm", "h2s_20m_ppm", "h2s_30m_ppm",
         "nh3_ppm", "nh3_10m_ppm", "nh3_20m_ppm", "nh3_30m_ppm",
         "voc_ppm", "voc_10m_ppm", "voc_20m_ppm", "voc_30m_ppm",
+        "h2s_calibration", "nh3_calibration", "voc_calibration",
         "battery_v", "temp_c", "rh_pct", "raw_string",
       ];
       const escCsv = (v) => {
@@ -690,12 +479,14 @@
       };
       const lines = [header.join(",")];
       for (const r of this.history) {
+        const rep = r.report;
         lines.push([
           r.ts, r.firebase_key, r.station_id,
           r.raw.nh3_we_mv, r.raw.h2s_we_mv, r.raw.h2s_ae_mv, r.raw.voc_mv,
-          r.report.h2s.value_ppm, r.report.h2s.avg_10m_ppm, r.report.h2s.avg_20m_ppm, r.report.h2s.avg_30m_ppm,
-          r.report.nh3.value_ppm, r.report.nh3.avg_10m_ppm, r.report.nh3.avg_20m_ppm, r.report.nh3.avg_30m_ppm,
-          r.report.voc.value_ppm, r.report.voc.avg_10m_ppm, r.report.voc.avg_20m_ppm, r.report.voc.avg_30m_ppm,
+          rep.h2s.value_ppm, rep.h2s.avg_10m_ppm, rep.h2s.avg_20m_ppm, rep.h2s.avg_30m_ppm,
+          rep.nh3.value_ppm, rep.nh3.avg_10m_ppm, rep.nh3.avg_20m_ppm, rep.nh3.avg_30m_ppm,
+          rep.voc.value_ppm, rep.voc.avg_10m_ppm, rep.voc.avg_20m_ppm, rep.voc.avg_30m_ppm,
+          rep.h2s.calibration, rep.nh3.calibration, rep.voc.calibration,
           r.hardware.battery_v ?? "", r.raw.head_t_c, r.raw.rh_pct, r.raw_string,
         ].map(escCsv).join(","));
       }

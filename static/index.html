@@ -6,7 +6,7 @@
   <title>AirWatch Dubai — Live Air Quality</title>
   <meta name="description" content="Live hydrogen sulfide, ammonia and VOC readings from the AQMS station in Dubai." />
   <link rel="stylesheet" href="./vendor/uPlot.min.css" />
-  <link rel="stylesheet" href="./app.css?v=13" />
+  <link rel="stylesheet" href="./app.css?v=14" />
   <script>
     // Apply saved/system theme before paint to avoid a flash
     (function () {
@@ -34,7 +34,7 @@
         <span class="dot"></span><span id="liveText">Connecting…</span>
       </span>
       <div class="seg" role="group" aria-label="Averaging window" id="avgTabs">
-        <button type="button" data-avg="live" aria-pressed="true" title="Instantaneous Kalman-smoothed reading">Live</button>
+        <button type="button" data-avg="live" aria-pressed="true" title="Latest reading: factory formula, no smoothing">Live</button>
         <button type="button" data-avg="10" aria-pressed="false" title="10-minute rolling average">10m Avg</button>
         <button type="button" data-avg="20" aria-pressed="false" title="20-minute rolling average">20m Avg</button>
         <button type="button" data-avg="30" aria-pressed="false" title="30-minute rolling average">30m Avg</button>
@@ -112,7 +112,7 @@
       <div id="chart" class="chart" role="img" aria-label="Concentration over time"></div>
       <div id="chartReadout" class="chart-readout" aria-live="off"></div>
       <div class="chart-key" id="chartKey">
-        <button type="button" class="key-toggle" data-sidx="1" aria-pressed="true"><i class="key-line"></i>Live (smoothed)</button>
+        <button type="button" class="key-toggle" data-sidx="1" aria-pressed="true"><i class="key-line"></i>Live</button>
         <button type="button" class="key-toggle" data-sidx="2" aria-pressed="true"><i class="key-line avg10"></i>10 min avg</button>
         <button type="button" class="key-toggle" data-sidx="3" aria-pressed="true"><i class="key-line avg20"></i>20 min avg</button>
         <button type="button" class="key-toggle" data-sidx="4" aria-pressed="true"><i class="key-line avg30"></i>30 min avg</button>
@@ -170,10 +170,11 @@
         </div>
         <h3>How the numbers are made</h3>
         <ul class="method">
-          <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary electrode): AAN 803 algorithm 1, <code>[(A1−WE_e) − n_T·(A2−AE_e)] / sensitivity</code>.</li>
-          <li><strong>NH₃</strong> (Alphasense NH₃-B1+, barcode <code>77840031</code>, A0 working electrode): factory sheet conversion <code>[(A0_V × 1000) − 328] / 58.624</code> (<code>WE₀ = 328 mV</code>, <code>73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm</code>, +200 mV biased 3-electrode ISB).</li>
-          <li><strong>VOC</strong> (Alphasense PIDX-A-040, A3): fixed clean-air zero plus ideal-gas temperature/pressure correction, reported as isobutylene equivalent.</li>
-          <li>Values are despiked and smoothed with a Hampel + 1D Kalman filter, with live 1σ noise estimates reported alongside every reading.</li>
+          <li><strong>Factory calibration only.</strong> Each gas uses only the zero and sensitivity printed on its Alphasense factory calibration sheet. No filtering, smoothing, temperature tables or clamping.</li>
+          <li><strong>NH₃</strong> (Alphasense NH₃-B1+, factory sheet <code>77840031</code>, A0): <code>(A0 mV − 328) / 58.624</code> ppm (<code>58.624 mV/ppm = 73.28 nA/ppm × 0.8 mV/nA</code>).</li>
+          <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary): <code>((A1 − WE zero) − (A2 − AE zero)) / sensitivity</code> ppb — no value until its factory sheet is entered.</li>
+          <li><strong>VOC</strong> (Alphasense PIDX-A-040, A3): <code>(A3 − V zero) / sensitivity</code> ppm isobutylene — no value until its factory sheet is entered.</li>
+          <li>10 / 20 / 30-minute values are plain averages of the readings in each window. Alarm levels use the 10-minute average. Weather is shown for information only.</li>
         </ul>
         <p class="muted small" id="calNote"></p>
         <div class="drawer-actions">
@@ -184,14 +185,14 @@
     </details>
 
     <footer class="foot muted small">
-      Data: AQMS station via Firebase · Weather: Open-Meteo · Readings are indicative until sensors are certificate-calibrated.
+      Data: AQMS station via Firebase · Weather: Open-Meteo · Values use Alphasense factory calibration sheets only.
     </footer>
   </main>
 
   <div id="tip" class="tip" role="tooltip" hidden></div>
 
   <script src="./vendor/uPlot.iife.min.js"></script>
-  <script src="./standalone_engine.js?v=13"></script>
-  <script src="./app.js?v=13"></script>
+  <script src="./standalone_engine.js?v=14"></script>
+  <script src="./app.js?v=14"></script>
 </body>
 </html>

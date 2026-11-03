@@ -1,8 +1,10 @@
-/* AirWatch Dubai — Standalone Browser Telemetry Engine (v7.4, Alphasense method only)
+/* AirWatch Dubai — Standalone Browser Telemetry Engine (v7.5, Alphasense method only)
  * Runs 100% client-side on GitHub Pages (or any static host) when /api/live is absent.
  * Connects directly to:
  *   1. Firebase RTDB: https://aqms-65300-default-rtdb.firebaseio.com/data.json
- *   2. Open-Meteo Dubai (weather panel only; not used in any formula)
+ *   2. Open-Meteo at the Tridel Dubai office (QD01, DAFZA Industrial Park, Al Qusais Industrial Area 5;
+ *      25.28934 N, 55.40345 E; Open-Meteo grid point 25.318 N, 55.394 E, 3.4 km away): the weather
+ *      panel, and the hourly air temperature as a STAND-IN for the sensor temperature (below)
  *
  * Each gas value uses a zero and a sensitivity, by Alphasense's method only. The sensitivity
  * is from the sensor's factory sheet (datasheet typical for VOC). The H2S and NH3 zeros are
@@ -12,6 +14,10 @@
  *   NH3 (ppm) = (A0 - 420) / 58.624                     (factory sheet 77840031 zero: 328)
  *   VOC (ppm) = (A3 - 70) / 55                          (datasheet typical, AAN 302-04)
  * A channel stuck at the ADC rail (>= 2550 mV or <= 5 mV) is a SENSOR_FAULT: no number.
+ * Temperature: the station sends no sensor temperature, so the Open-Meteo hourly air temperature at
+ * the Tridel office is used for the datasheet SENSITIVITY correction of each gas (AAN 803-05 step 5:
+ * H2S-B4 Fig. 1, NH3-B1 Fig. 2; PIDX-A-040 ideal gas law). The H2S zero correction (AAN 803-05
+ * Table 3) stays off: it needs the ISB electronic offsets. No Open-Meteo data -> no correction.
  * No spike filter, no smoothing, no noise models, no temperature tables.
  * A negative result counts as 0, and the 10/20/30-minute averages are made from those values.
  * 10 / 20 / 30-minute values are plain averages; alarm levels use the 10-minute average.
@@ -21,7 +27,7 @@
 
   const FIREBASE_URL = "https://aqms-65300-default-rtdb.firebaseio.com/data.json";
   const WEATHER_URL =
-    "https://api.open-meteo.com/v1/forecast?latitude=25.277&longitude=55.396" +
+    "https://api.open-meteo.com/v1/forecast?latitude=25.28934&longitude=55.40345" +
     "&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m" +
     "&hourly=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m" +
     "&past_days=2&forecast_days=1&wind_speed_unit=ms&timezone=UTC";
@@ -31,6 +37,25 @@
   // A channel this close to either end of the 0-2560 mV ADC range is stuck (unplugged, no power, shorted).
   const RAIL_HIGH_MV = 2550, RAIL_LOW_MV = 5;
   const atRail = (mv) => mv >= RAIL_HIGH_MV || mv <= RAIL_LOW_MV;
+  const WEATHER_SOURCE = "Open-Meteo (Tridel Dubai office)";
+
+  // Sensitivity as % of the 20 degC value at -30, -20, ... 50 degC, read from the datasheet charts
+  // (typical batch; approximate). Same values as gas_algo/factory_formulas.py.
+  const SENS_TEMPS_C = [-30, -20, -10, 0, 10, 20, 30, 40, 50];
+  const SENS_PCT = {
+    h2s: [77, 82, 87, 92, 96, 100, 103, 105.5, 105.5],    // H2S-B4 datasheet Fig. 1
+    nh3: [116, 112, 104, 100, 98.5, 100, 103, 110, 125],  // NH3-B1 datasheet Fig. 2
+  };
+  function sensitivityPct(gas, tempC) {
+    if (gas === "voc") return (100 * 293.15) / (273.15 + tempC);   // PIDX-A-040: ideal gas law (datasheet Fig. 2)
+    const T = SENS_TEMPS_C, f = SENS_PCT[gas];
+    if (tempC <= T[0]) return f[0];
+    if (tempC >= T[T.length - 1]) return f[f.length - 1];
+    for (let i = 0; i < T.length - 1; i++) {
+      if (tempC >= T[i] && tempC <= T[i + 1]) return f[i] + ((f[i + 1] - f[i]) * (tempC - T[i])) / (T[i + 1] - T[i]);
+    }
+    return 100;
+  }
   const ALARM_CODE = { NORMAL: 0, WARNING: 1, ACTION: 2, CRITICAL: 3 };
 
   // Calibration values, Alphasense method only.
@@ -51,14 +76,16 @@
   };
 
   const CONFIG = {
-    algo_version: "v7.4-web (H2S + NH3 site zero with factory sensitivity, VOC datasheet typical, stuck-channel fault, negatives as 0)",
+    algo_version: "v7.5-web (H2S + NH3 site zero with factory sensitivity, VOC datasheet typical, sensitivity at Open-Meteo temperature, stuck-channel fault, negatives as 0)",
     power_gap_reset_s: 15 * 60,
     calibration_note:
       "Alphasense method only. H₂S-B4 and NH₃-B1+ use a site zero (the station's clean-air output, 02:00–05:00 " +
       "Dubai, as Alphasense advise) with their factory-sheet sensitivity: H₂S ((A1 − 458) − (A2 − 359)) / 1.727952 ppb, " +
       "NH₃ (A0 − 420) / 58.624 ppm. PIDX-A-040 uses datasheet typical values: (A3 − 70) / 55 ppm, indicative. " +
+      "Each sensitivity is corrected to the Open-Meteo hourly air temperature at the Tridel Dubai office " +
+      "(datasheet charts; ideal gas law for the PID), a stand-in until the station sends sensor temperature. " +
       "A channel stuck at the ADC limit is shown as a sensor fault. A negative result counts as 0. " +
-      "No filtering, smoothing or temperature tables are applied.",
+      "No filtering or smoothing is applied.",
     thresholds: {
       h2s_ppm: { warning: 0.5, action: 1.5, critical: 5.0 },
       nh3_ppm: { warning: 5.0, action: 15.0, critical: 35.0 },
@@ -111,9 +138,12 @@
     if (!ts) ts = new Date().toISOString();
 
     const hourKey = ts.slice(0, 13);
-    const w = (weatherByHour && weatherByHour[hourKey])
-      ? { ...weatherByHour[hourKey], source: `Open-Meteo hourly ${hourKey}:00 UTC` }
+    const hourly = !!(weatherByHour && weatherByHour[hourKey]);
+    const w = hourly
+      ? { ...weatherByHour[hourKey], source: `Open-Meteo hourly ${hourKey}:00 UTC, Tridel Dubai office` }
       : fallbackWeather;
+    // Only a real Open-Meteo value may correct a gas; the built-in defaults are for display only.
+    const tempFromOpenMeteo = hourly || !!(fallbackWeather && fallbackWeather.fetched_at);
 
     let counts = [0, 0, 0, 0];
     let volts = Array.isArray(rec.volts) && rec.volts.length >= 4 ? rec.volts.slice(0, 4).map(Number) : null;
@@ -171,11 +201,12 @@
       stm32_status: stm32Status,
       // Weather: shown on the dashboard only, never used in a formula.
       head_t_c: Number(w.temp_c ?? 28.0),
+      temp_from_open_meteo: tempFromOpenMeteo,
       rh_pct: Number(w.rh_pct ?? 60.0),
       p_hpa: Number(w.press_hpa ?? 1013.25),
       wind_speed_ms: Number(w.wind_speed_ms ?? 2.0),
       wind_dir_deg: Number(w.wind_dir_deg ?? 0.0),
-      weather_source: w.source || "Open-Meteo (Dubai)",
+      weather_source: w.source || WEATHER_SOURCE,
     };
   }
 
@@ -187,7 +218,7 @@
       this.weather = {
         temp_c: 28.0, rh_pct: 55.0, press_hpa: 1013.25,
         wind_speed_ms: 2.0, wind_dir_deg: 90.0,
-        fetched_at: "", source: "Open-Meteo (Dubai)", by_hour: {},
+        fetched_at: "", source: WEATHER_SOURCE, by_hour: {},
       };
       this.weatherFetchedUnix = 0;
       this.firebaseConnected = false;
@@ -240,10 +271,14 @@
       const rail = { h2s: atRail(weMv) || atRail(aeMv), nh3: atRail(nh3Mv), voc: atRail(vocMv) };
       const vocFault = !!fV && vocMv < (fV.fault_below_mv ?? fV.we_zero_mv);
       const fault = { h2s: rail.h2s, nh3: rail.nh3, voc: rail.voc || vocFault };
+      // Sensitivity at the Open-Meteo air temperature (stand-in for the sensor temperature).
+      const tempC = p.temp_from_open_meteo && Number.isFinite(p.head_t_c) ? p.head_t_c : null;
+      const pct = {};
+      for (const g of GASES) pct[g] = tempC === null ? 100 : sensitivityPct(g, tempC);
       const value = {
-        h2s: fH && !fault.h2s ? h2sPpb(weMv, fH.we_zero_mv, aeMv, fH.ae_zero_mv, fH.sensitivity) / 1000.0 : null,
-        nh3: fN && !fault.nh3 ? nh3Ppm(nh3Mv, fN.we_zero_mv, fN.sensitivity) : null,
-        voc: fV && !fault.voc ? vocPpm(vocMv, fV.we_zero_mv, fV.sensitivity) : null,
+        h2s: fH && !fault.h2s ? h2sPpb(weMv, fH.we_zero_mv, aeMv, fH.ae_zero_mv, fH.sensitivity * pct.h2s / 100) / 1000.0 : null,
+        nh3: fN && !fault.nh3 ? nh3Ppm(nh3Mv, fN.we_zero_mv, fN.sensitivity * pct.nh3 / 100) : null,
+        voc: fV && !fault.voc ? vocPpm(vocMv, fV.we_zero_mv, fV.sensitivity * pct.voc / 100) : null,
       };
       // A negative result counts as 0; the averages below use these floored values.
       for (const g of GASES) if (value[g] != null && value[g] < 0) value[g] = 0;
@@ -274,7 +309,10 @@
           avg_30m_ppm: round(winMean(1800, g)),
           status: !factory(g) ? "NO_CALIBRATION" : fault[g] ? "SENSOR_FAULT"
             : { datasheet: "DATASHEET_TYPICAL", site_zero: "SITE_ZERO" }[factory(g).source] || "FACTORY_CAL",
-          calibration: calibrationLabel(g),
+          calibration: calibrationLabel(g) + (tempC === null ? " · no temperature correction"
+            : ` · sensitivity ${pct[g].toFixed(1)} % at ${tempC.toFixed(1)} °C (Open-Meteo)`),
+          temp_c: tempC,
+          sensitivity_pct: round(pct[g], 2),
           signal: signal[g],
         };
       }
@@ -295,6 +333,8 @@
       if (bySource("site_zero").length) calParts.push(`Site zero + factory sensitivity: ${bySource("site_zero").join(", ")}`);
       if (bySource("factory").length) calParts.push(`Factory sheet: ${bySource("factory").join(", ")}`);
       if (bySource("datasheet").length) calParts.push(`Datasheet typical: ${bySource("datasheet").join(", ")}`);
+      calParts.push(tempC === null ? "No temperature correction (Open-Meteo unavailable)"
+        : `Sensitivity at ${tempC.toFixed(1)} °C (Open-Meteo, Tridel office)`);
 
       const recOut = {
         ts: p.ts,
@@ -356,7 +396,7 @@
           wind_speed_ms: Number(cur.wind_speed_10m ?? 2.0),
           wind_dir_deg: Number(cur.wind_direction_10m ?? 90.0),
           fetched_at: cur.time || "",
-          source: "Open-Meteo (Dubai)",
+          source: WEATHER_SOURCE,
           by_hour: byHour,
         };
         this.weatherFetchedUnix = now;

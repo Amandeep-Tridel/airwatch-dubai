@@ -6,7 +6,7 @@
   <title>AirWatch Dubai — Live Air Quality</title>
   <meta name="description" content="Live hydrogen sulfide, ammonia and VOC readings from the AQMS station in Dubai." />
   <link rel="stylesheet" href="./vendor/uPlot.min.css" />
-  <link rel="stylesheet" href="./app.css?v=15" />
+  <link rel="stylesheet" href="./app.css?v=16" />
   <script>
     // Apply saved/system theme before paint to avoid a flash
     (function () {
@@ -170,7 +170,7 @@
         </div>
         <h3>How the numbers are made</h3>
         <ul class="method">
-          <li><strong>Alphasense calibration values only.</strong> Each gas uses an Alphasense zero and sensitivity: the sensor's own factory sheet where available, otherwise Alphasense's datasheet typical values. No filtering, smoothing, temperature tables or clamping.</li>
+          <li><strong>Alphasense calibration values only.</strong> Each gas uses an Alphasense zero and sensitivity: the sensor's own factory sheet where available, otherwise Alphasense's datasheet typical values. No filtering, smoothing or temperature tables. A negative result is shown as 0, and the averages use those values.</li>
           <li><strong>NH₃</strong> (Alphasense NH₃-B1+, factory sheet <code>77840031</code>, A0): <code>(A0 mV − 328) / 58.624</code> ppm (<code>58.624 mV/ppm = 73.28 nA/ppm × 0.8 mV/nA</code>).</li>
           <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary): <code>((A1 − 350) − (A2 − 350)) / 1.4</code> ppb — Alphasense datasheet typical (ISB manual Table 2: zero 350/350 mV, 1750 nA/ppm × 0.8 mV/nA). Indicative until its factory sheet is entered.</li>
           <li><strong>VOC</strong> (Alphasense PIDX-A-040, A3): <code>(A3 − 70) / 55</code> ppm isobutylene — Alphasense datasheet typical (offset 40–100 mV, midpoint used; 55 mV/ppm). Indicative until its factory sheet is entered.</li>
@@ -192,7 +192,7 @@
   <div id="tip" class="tip" role="tooltip" hidden></div>
 
   <script src="./vendor/uPlot.iife.min.js"></script>
-  <script src="./standalone_engine.js?v=15"></script>
-  <script src="./app.js?v=15"></script>
+  <script src="./standalone_engine.js?v=16"></script>
+  <script src="./app.js?v=16"></script>
 </body>
 </html>

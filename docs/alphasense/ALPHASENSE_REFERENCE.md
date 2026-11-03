@@ -1,6 +1,6 @@
 # Alphasense Reference Data for the AQMS Algorithms
 
-**Method: Alphasense calibration values only.** Every gas value uses only an Alphasense zero and sensitivity: the sensor's own factory calibration sheet where available, otherwise Alphasense's published datasheet typical values. No temperature tables, no values fitted to station data, no filtering or smoothing, no clamping.
+**Method: Alphasense calibration values only.** Every gas value uses only an Alphasense zero and sensitivity: the sensor's own factory calibration sheet where available, otherwise Alphasense's published datasheet typical values. No temperature tables, no values fitted to station data, no filtering or smoothing. A negative result counts as 0, also inside the averages.
 
 Source PDFs were downloaded from the official Alphasense/AMETEK CDN on 2026-10-29 and are stored in this folder:
 

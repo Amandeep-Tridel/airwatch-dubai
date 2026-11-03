@@ -1,4 +1,4 @@
-/* AirWatch Dubai — dashboard logic (v6)
+/* AirWatch Dubai — dashboard logic (v7, factory calibration only)
  * Polls small JSON endpoints instead of streaming the full history:
  *   /api/live     every 10 s   (~2 KB)
  *   /api/history  on new sample or range change
@@ -21,12 +21,12 @@
            desc: "Fuel vapour, solvents and traffic (isobutylene equivalent)." },
   };
   const ORDER = ["h2s", "nh3", "voc"];
-  const STATUS = ["WARMUP", "BELOW_LOD", "INDICATIVE", "QUANTITATIVE"];
+  const STATUS = ["WARMUP", "BELOW_LOD", "INDICATIVE", "FACTORY_CAL", "NO_CALIBRATION"];
   const ALARM = ["NORMAL", "WARNING", "ACTION", "CRITICAL"];
 
   // Timeline colour classes c0..c7
   const TL_LEGEND = [
-    [3, "Normal"], [4, "NH₃ rise"], [5, "Elevated"], [6, "High"], [7, "Very high"], [1, "Warming up"], [0, "No data"],
+    [3, "Normal"], [5, "Elevated"], [6, "High"], [7, "Very high"], [1, "No factory calibration"], [0, "No data"],
   ];
 
   // ------------------------------------------------------------------ state
@@ -56,8 +56,8 @@
 
   function conv(ppm) {
     if (ppm == null || !isFinite(ppm)) return null;
-    const clamped = Math.max(0, ppm);
-    return state.unit === "ppb" ? clamped * 1000 : clamped;
+    // The factory formula's answer is shown as it is: no clamping, no smoothing.
+    return state.unit === "ppb" ? ppm * 1000 : ppm;
   }
   function fmtVal(gas, ppm) {
     const v = conv(ppm);
@@ -116,11 +116,10 @@
   /** Plain-language state for one gas reading. tone ∈ good|ok|notice|warn|high|bad|muted */
   function gasState(gas, g) {
     if (!g) return { label: "No data", tone: "muted", rank: 0 };
+    if (g.status === "NO_CALIBRATION") return { label: "No factory calibration", tone: "muted", rank: 1 };
     if (g.alarm === "CRITICAL") return { label: "Very high", tone: "bad", rank: 7 };
     if (g.alarm === "ACTION") return { label: "High", tone: "high", rank: 6 };
     if (g.alarm === "WARNING") return { label: "Elevated", tone: "warn", rank: 5 };
-    if (g.status === "WARMUP") return { label: "Warming up", tone: "muted", rank: 1 };
-    if (gas === "nh3" && g.event) return { label: "Rise detected", tone: "notice", rank: 4 };
     return { label: "Normal", tone: "good", rank: 3 };
   }
 
@@ -159,8 +158,11 @@
     const age = stationAgeSec();
     const states = ORDER.map((g) => ({ g, s: gasState(g, L.gases[g]) }));
     const worst = states.reduce((a, b) => (b.s.rank > a.s.rank ? b : a));
-    const detected = states.filter((x) => x.s.rank === 3).map((x) => GAS[x.g].formula);
-    const allWarm = states.every((x) => x.s.rank === 1);
+    const uncal = states.filter((x) => x.s.rank === 1).map((x) => GAS[x.g].formula);
+    const calibrated = states.filter((x) => x.s.rank >= 3).map((x) => GAS[x.g].formula);
+    const uncalText = uncal.length
+      ? ` ${uncal.join(" and ")} ${uncal.length > 1 ? "have" : "has"} no Alphasense factory calibration sheet entered yet, so no value is shown.`
+      : "";
 
     let tone, head, detail;
     if (age != null && age > STALE_MIN * 60) {
@@ -170,22 +172,19 @@
       tone = worst.s.tone;
       head = `${worst.s.label} ${GAS[worst.g].name.toLowerCase()} level`;
       detail = `${GAS[worst.g].formula} is above its ${L.gases[worst.g].alarm.toLowerCase()} threshold. Check the source and ventilation.`;
-    } else if (allWarm) {
-      tone = "muted"; head = "Sensors are warming up";
-      detail = "Readings stabilise after power-on (H₂S 1 h, NH₃ 3 h, VOC 5 min).";
-    } else if (worst.s.rank === 4) {
-      tone = "notice"; head = "Ammonia signal is rising";
-      detail = "The NH₃ sensor shows a sustained rise above baseline.";
+    } else if (!calibrated.length) {
+      tone = "muted"; head = "No factory calibration entered";
+      detail = "Values appear once each sensor's Alphasense factory calibration sheet is entered.";
     } else {
-      tone = "good"; head = "Air quality is good";
-      detail = "All monitored gases (H₂S, NH₃, VOC) are within normal range and well below safety thresholds.";
+      tone = "good"; head = "No alarm";
+      detail = `${calibrated.join(", ")} ${calibrated.length > 1 ? "are" : "is"} below the warning threshold (10-minute average).${uncalText}`;
     }
     banner.className = `status-banner tone-${tone}`;
     $("#statusIcon").innerHTML = ICONS[tone] || ICONS.muted;
     $("#statusHeadline").textContent = head;
     $("#statusDetail").textContent = detail;
     $("#lastReading").textContent = `${fmtTime(L.ts_unix)} GST`;
-    $("#calState").textContent = L.calibration_verified ? "Certified" : "Provisional";
+    $("#calState").textContent = L.calibration_label || "—";
     $("#stationId").textContent = L.station_id;
   }
 
@@ -197,13 +196,15 @@
     if (idx.length < 2) return "";
     const srcKey = state.avg === "10" ? "r10" : state.avg === "20" ? "r20" : state.avg === "30" ? "r30" : "v";
     const arr = H[gas][srcKey] || H[gas].v;
-    const vs = idx.map((i) => Math.max(0, arr[i] ?? 0));
-    let lo = 0, hi = Math.max(...vs);
-    if (hi - lo < 1e-6) { hi = 0.01; }
+    const vs = idx.map((i) => arr[i]);
+    const ok = vs.filter((v) => v != null && isFinite(v));
+    if (ok.length < 2) return "";
+    let lo = Math.min(...ok), hi = Math.max(...ok);
+    if (hi - lo < 1e-6) { hi = lo + 0.01; }
     const W = 300, Hh = 44, pad = 4;
     const x = (k) => (k / (idx.length - 1)) * W;
     const y = (v) => Hh - pad - ((v - lo) / (hi - lo)) * (Hh - 2 * pad);
-    const line = vs.map((v, k) => `${x(k).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    const line = vs.map((v, k) => (v == null || !isFinite(v) ? null : `${x(k).toFixed(1)},${y(v).toFixed(1)}`)).filter(Boolean).join(" ");
     const col = css(GAS[gas].color);
     return `<svg class="gc-spark" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" aria-hidden="true">
       <polyline points="${line}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
@@ -226,13 +227,13 @@
 
       let valueHTML, sub, avgsHTML = "";
       if (!g) { valueHTML = `<span class="gc-value as-text">—</span>`; sub = ""; }
-      else if (g.status === "WARMUP") {
-        valueHTML = `<span class="gc-value as-text">Warming up</span>`;
-        sub = "Sensor is stabilising after power-on";
+      else if (g.status === "NO_CALIBRATION") {
+        valueHTML = `<span class="gc-value as-text">No factory calibration</span>`;
+        sub = `Raw signal ${esc(g.signal)} · enter the Alphasense factory sheet to show ${state.unit}`;
       } else {
         const badge = state.avg === "live" ? "" : `<span class="gc-mode-badge">${AVG_LABELS[state.avg]}</span>`;
         valueHTML = `<span class="gc-value">${fmtVal(gas, activePpm)}</span><span class="gc-unit">${state.unit}</span>${badge}`;
-        sub = `Sample ${fmtVal(gas, g.sample_ppm)} ${state.unit} · ± ${fmtVal(gas, g.noise_ppm)} ${state.unit} noise`;
+        sub = `${esc(g.signal)} · ${esc(g.calibration)}`;
         avgsHTML = `<div class="gc-avgs" role="group" aria-label="${meta.name} rolling averages">` +
           [["live", "Live"], ["10", "10m avg"], ["20", "20m avg"], ["30", "30m avg"]].map(([k, lbl]) =>
             `<button type="button" class="gc-avg-tile ${state.avg === k ? "is-active" : ""}" data-avg-pick="${k}">
@@ -243,9 +244,7 @@
 
       const warn = th[`${gas}_ppm`]?.warning;
       const pct = warn && g ? Math.max(0, Math.min(100, (Math.max(0, activePpm ?? 0) / warn) * 100)) : 0;
-      const pctText = !g || g.status === "WARMUP" ? "—" : `${pct < 1 && pct > 0 ? "<1" : pct.toFixed(0)}%`;
-      const trend = g?.trend && g.status !== "WARMUP"
-        ? { RISING: "↗ rising", FALLING: "↘ falling", STABLE: "→ steady" }[g.trend] : "";
+      const pctText = !g || g.status === "NO_CALIBRATION" || activePpm == null ? "—" : `${pct < 1 && pct > 0 ? "<1" : pct.toFixed(0)}%`;
 
       card.innerHTML = `
         <div class="gc-top">
@@ -256,7 +255,7 @@
           <span class="pill ${s.tone}">${s.label}</span>
         </div>
         <div class="gc-reading">${valueHTML}</div>
-        <div class="gc-sub">${sub} ${trend ? `<span class="muted">· ${trend}</span>` : ""}</div>
+        <div class="gc-sub">${sub}</div>
         ${avgsHTML}
         ${sparkSVG(gas)}
         <div class="gc-bar" title="Share of the warning threshold"><span style="width:${pct}%"></span></div>
@@ -273,7 +272,7 @@
     const cut30 = end - 1800;
 
     const headCols = [
-      ["live", "Live (Smoothed)"],
+      ["live", "Live"],
       ["10", "10 min Avg"],
       ["20", "20 min Avg"],
       ["30", "30 min Avg"],
@@ -288,7 +287,7 @@
         let peak30 = avgs.live;
         if (H?.t?.length) {
           for (let i = H.t.length - 1; i >= 0 && H.t[i] >= cut30; i--) {
-            if (H[gas].v[i] > (peak30 ?? -Infinity)) peak30 = H[gas].v[i];
+            if (H[gas].v[i] != null && H[gas].v[i] > (peak30 ?? -Infinity)) peak30 = H[gas].v[i];
           }
         }
         const warn = th[`${gas}_ppm`]?.warning;
@@ -429,9 +428,9 @@
         const b = Math.floor((t - start) / BUCKET);
         if (b < 0 || b >= N) return;
         const st = STATUS[H[gas].st[i]], al = ALARM[H[gas].al[i]];
-        const s = gasState(gas, { status: st, alarm: al, event: gas === "nh3" ? !!H.nh3.ev[i] : false });
+        const s = gasState(gas, { status: st, alarm: al });
         worst[b] = Math.max(worst[b], s.rank);
-        if (st === "INDICATIVE" || st === "QUANTITATIVE") maxV[b] = Math.max(maxV[b] ?? -Infinity, H[gas].v[i]);
+        if (st === "FACTORY_CAL" && H[gas].v[i] != null) maxV[b] = Math.max(maxV[b] ?? -Infinity, H[gas].v[i]);
       });
       const cells = worst.map((c, b) => {
         const t0 = start + b * BUCKET;
@@ -477,18 +476,18 @@
       ["A3 · VOC (PID) output", `${v.voc_mv.toFixed(2)} mV`],
       ["Battery", r.hardware?.battery_v != null ? `${Number(r.hardware.battery_v).toFixed(3)} V` : "—"],
       ["Uptime since power-on", r.uptime_min != null ? `${(r.uptime_min / 60).toFixed(1)} h` : "—"],
-      ["Spike filter / supply dips", `${r.dsp.spike_rate_pct}% · ${r.dsp.battery_dips_total} dips`],
       ["Algorithm", r.algo_version],
     ].map(([k, val]) => `<tr><td>${k}</td><td>${esc(val)}</td></tr>`).join("");
 
     $("#qualityTable").innerHTML = ORDER.map((g) => {
       const rep = r.report[g];
-      return `<tr><td>${GAS[g].formula} status</td><td>${rep.status} · value ${rep.value_ppm.toFixed(4)} ppm</td></tr>
-              <tr><td>${GAS[g].formula} noise / uncertainty</td><td>noise ${rep.noise_ppm.toFixed(4)} · ± ${rep.uncertainty_ppm.toFixed(4)} ppm</td></tr>
+      const val = rep.value_ppm == null ? "no value" : `value ${rep.value_ppm.toFixed(4)} ppm`;
+      return `<tr><td>${GAS[g].formula} status</td><td>${esc(rep.status)} · ${val}</td></tr>
+              <tr><td>${GAS[g].formula} calibration</td><td>${esc(rep.calibration)}</td></tr>
               <tr><td>${GAS[g].formula} flags</td><td>${esc(r.qc[`${g}_flags`])}</td></tr>`;
     }).join("");
 
-    const cell = (g, rep) => rep.status === "WARMUP" ? "warm-up" : rep.value_ppm.toFixed(GAS[g].dec.ppm + 1);
+    const cell = (g, rep) => rep.value_ppm == null ? "—" : rep.value_ppm.toFixed(GAS[g].dec.ppm + 1);
     $("#recentTable").innerHTML =
       `<thead><tr><th>Time (GST)</th><th>A0 mV</th><th>A1 mV</th><th>A2 mV</th><th>A3 mV</th><th>Batt V</th><th>H₂S ppm</th><th>NH₃ ppm</th><th>VOC ppm</th></tr></thead><tbody>` +
       d.recent.map((p) => `<tr><td>${fmtTime(Date.parse(p.ts) / 1000, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</td>

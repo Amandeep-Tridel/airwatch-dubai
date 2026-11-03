@@ -6,24 +6,26 @@ station in clean air. No filtering, no smoothing.
 
     H2S-B4 (4 electrodes, on ISB):
         H2S (ppb) = ((WE - WE zero) - (AE - AE zero)) / sensitivity (mV/ppb)
-        This is Alphasense AAN 803-05 Algorithm 3 at the factory calibration
-        temperature, where Alphasense's factor k'T is 1 (AAN 803-05, Table 3).
+        This is Alphasense AAN 803-05 Algorithm 3 at 20 degC, where its factor k'T is 1
+        (AAN 803-05, Table 3).
     NH3-B1 (3 electrodes, on ISB):
         NH3 (ppm) = (WE - WE zero) / sensitivity (mV/ppm)
         As printed on the factory sheet, e.g. sensor 77840031: (mV - 328) / 58.624
         This is AAN 803-05 Algorithm 4 with no AE and k''T = 0 (20 degC).
     PIDX-A-040 (PID):
         VOC (ppm as isobutylene) = (V - V zero) / sensitivity (mV/ppm)
-        Alphasense AAN 302-04; no temperature correction needed.
 
 "WE zero" and "AE zero" are the TOTAL zero offsets (board offset and sensor zero
 together), from the factory sheet or from a site zero (AAN 803-05, "Initial calibration").
 All voltages are in millivolts (mV).
 
-Temperature correction (AAN 803-05, Tables 1 and 3) is at the end of this file. It is
-OFF until the station sends the temperature at the top of the sensor and the calibration
-record has the board's electronic offsets (WEe, AEe). At 20 degC it gives the same
-answer as the formulas above.
+Temperature correction is at the end of this file. It needs the temperature at the top of
+the sensor, which the station does not send yet. At 20 degC it changes nothing.
+  - Sensitivity (all three sensors): AAN 803-05 step 5 divides by a temperature-corrected
+    sensitivity, read from the datasheet chart (H2S-B4 Fig. 1, NH3-B1 Fig. 2). The
+    PIDX-A-040 datasheet (Fig. 2) says its output follows the ideal gas law.
+  - Zero (H2S-B4 only): AAN 803-05 Tables 1 and 3. Also needs the board's electronic
+    offsets (WEe, AEe); Algorithm 4 also needs the board gain, because k''T is in nA.
 """
 
 # The station's ADC: 16-bit, bipolar, 2.56 V full scale (as wired on the test station).
@@ -68,22 +70,37 @@ def voc_sensor_fault(v_mv, v_zero_mv):
     return v_mv < v_zero_mv
 
 
-# ---- Temperature correction, AAN 803-05 (OFF until sensor temperature is available) ----
+# ---- Temperature correction (only with the temperature at the top of the sensor) ----
+
+TABLE3_TEMPS_C = (-30, -20, -10, 0, 10, 20, 30, 40, 50)
 
 # AAN 803-05 Table 3, H2S-B4 row, copied exactly. Factors at -30, -20, ... 50 degC.
-TABLE3_TEMPS_C = (-30, -20, -10, 0, 10, 20, 30, 40, 50)
+# nT, kT and k'T have no unit. k''T is a current in nA: it matches the H2S-B4 datasheet's
+# Fig. 2 zero shift (-65 / -125 / -180 nA at 30 / 40 / 50 degC), so on a board it is
+# multiplied by the board gain (mV/nA) before it is taken from a voltage.
 H2S_B4_FACTORS = {
     1: (-0.6, -0.6, 0.1, 0.8, -0.7, -2.5, -2.5, -2.2, -1.8),   # nT
     2: (0.2, 0.2, 0, -0.3, 0.3, 1, 1, 0.9, 0.7),               # kT
     3: (-14, -14, 3, 3, 2, 1, -1.2, -1.2, -1.2),               # k'T
-    4: (52, 51, 48, 45, 26, 0, -65, -125, -180),               # k''T (mV)
+    4: (52, 51, 48, 45, 26, 0, -65, -125, -180),               # k''T (nA)
 }
 # AAN 803-05 Table 2 suggests Algorithm 1 for B-type H2S (alternative: 2). Table 3 has no
-# NH3-B1 row, so the NH3-B1 (3 electrodes, no AE) can only use Algorithm 4 with k''T = 0.
+# NH3-B1 row, and the NH3-B1 datasheet gives no zero-vs-temperature data ("nd"), so the NH3
+# zero gets no temperature correction.
+
+# Sensitivity as % of the 20 degC value, at -30, -20, ... 50 degC. Read from the datasheet
+# charts (middle of the typical batch shown), so they are approximate: replace them with
+# Alphasense's tabulated values if they send them.
+SENSITIVITY_PCT = {
+    "H2S-B4": (77, 82, 87, 92, 96, 100, 103, 105.5, 105.5),     # H2S-B4 datasheet Fig. 1
+    "NH3-B1": (116, 112, 104, 100, 98.5, 100, 103, 110, 125),   # NH3-B1 datasheet Fig. 2
+}
+IDEAL_GAS_REF_K = 293.15   # 20 degC: the PIDX-A-040 is specified at room temperature
 
 
 def table3_factor(factors, temp_c):
-    """Factor at temp_c, linearly interpolated between the Table 3 temperatures (AAN 803-05)."""
+    """Value at temp_c, linearly interpolated between the Table 3 temperatures (AAN 803-05).
+    Outside -30 to 50 degC the end value is used."""
     if temp_c <= TABLE3_TEMPS_C[0]:
         return factors[0]
     if temp_c >= TABLE3_TEMPS_C[-1]:
@@ -94,11 +111,22 @@ def table3_factor(factors, temp_c):
             return factors[i] + (factors[i + 1] - factors[i]) * (temp_c - t0) / (t1 - t0)
 
 
+def aan803_factor(algorithm, temp_c, gain_mv_per_na=None):
+    """The H2S-B4 Table 3 factor for this algorithm and temperature, ready for
+    aan803_corrected_we. Algorithm 4's k''T (nA) is turned into mV with the board gain;
+    without a gain it returns None (cannot be used)."""
+    factor = table3_factor(H2S_B4_FACTORS[algorithm], temp_c)
+    if algorithm == 4:
+        return None if gain_mv_per_na is None else factor * gain_mv_per_na
+    return factor
+
+
 def aan803_corrected_we(algorithm, factor, we_u, we_e, we_t, ae_u=None, ae_e=None, ae_t=None):
     """Corrected WE output WEc (mV), AAN 803-05 Table 1.
 
     we_u, ae_u: raw WE and AE outputs.  we_e, ae_e: electronic offsets on the board.
     we_t, ae_t: total zero offsets (sheet or site zero).  Sensor zeros: WEo = WEt - WEe, AEo = AEt - AEe.
+    factor: from aan803_factor (for Algorithm 4 already in mV).
     """
     we_o = we_t - we_e
     if algorithm == 4:
@@ -111,3 +139,16 @@ def aan803_corrected_we(algorithm, factor, we_u, we_e, we_t, ae_u=None, ae_e=Non
     if algorithm == 3:
         return (we_u - we_e) - (we_o - ae_o) - factor * (ae_u - ae_e)
     raise ValueError(f"unknown AAN 803-05 algorithm {algorithm}")
+
+
+def sensitivity_pct(sensor_model, temp_c):
+    """Sensitivity at temp_c as % of the 20 degC value, or None for an unknown sensor.
+
+    H2S-B4 and NH3-B1: the datasheet chart (AAN 803-05 step 5). PIDX-A-040: the ideal gas
+    law, as its datasheet says: 100 x 293.15 / (273.15 + T)."""
+    model = (sensor_model or "").rstrip("+")
+    if model in SENSITIVITY_PCT:
+        return table3_factor(SENSITIVITY_PCT[model], temp_c)
+    if model == "PIDX-A-040":
+        return 100.0 * IDEAL_GAS_REF_K / (273.15 + temp_c)
+    return None

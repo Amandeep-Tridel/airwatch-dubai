@@ -6,7 +6,7 @@
   <title>AirWatch Dubai — Live Air Quality</title>
   <meta name="description" content="Live hydrogen sulfide, ammonia and VOC readings from the AQMS station in Dubai." />
   <link rel="stylesheet" href="./vendor/uPlot.min.css" />
-  <link rel="stylesheet" href="./app.css?v=17" />
+  <link rel="stylesheet" href="./app.css?v=18" />
   <script>
     // Apply saved/system theme before paint to avoid a flash
     (function () {
@@ -172,7 +172,7 @@
         <ul class="method">
           <li><strong>Alphasense calibration values only.</strong> Each gas uses an Alphasense zero and sensitivity: the sensor's own factory sheet where available, otherwise Alphasense's datasheet typical values. No filtering, smoothing or temperature tables. A negative result is shown as 0, and the averages use those values.</li>
           <li><strong>NH₃</strong> (Alphasense NH₃-B1+, factory sheet <code>77840031</code>, A0): <code>(A0 mV − 328) / 58.624</code> ppm (<code>58.624 mV/ppm = 73.28 nA/ppm × 0.8 mV/nA</code>).</li>
-          <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary): <code>((A1 − 395) − (A2 − 362)) / 1.727952</code> ppb, from its factory sheet (WE zero 395 mV, AE zero 362 mV, 1727.952 mV/ppm).</li>
+          <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary): <code>((A1 − 458) − (A2 − 359)) / 1.727952</code> ppb. Sensitivity from its factory sheet; zeros from a site zero (the station's clean-air output, 02:00–05:00 Dubai), as Alphasense advise. Factory-sheet zeros: 395 / 362 mV.</li>
           <li><strong>VOC</strong> (Alphasense PIDX-A-040, A3): <code>(A3 − 70) / 55</code> ppm isobutylene — Alphasense datasheet typical (offset 40–100 mV, midpoint used; 55 mV/ppm). Indicative until its factory sheet is entered.</li>
           <li>10 / 20 / 30-minute values are plain averages of the readings in each window. Alarm levels use the 10-minute average. Weather is shown for information only.</li>
         </ul>
@@ -185,14 +185,14 @@
     </details>
 
     <footer class="foot muted small">
-      Data: AQMS station via Firebase · Weather: Open-Meteo · Values use Alphasense calibration values only (factory sheets for H₂S and NH₃; datasheet typical for VOC).
+      Data: AQMS station via Firebase · Weather: Open-Meteo · Values use Alphasense's method only (site zero with factory-sheet sensitivity for H₂S and NH₃; datasheet typical for VOC). A channel stuck at the limit of its range is shown as a sensor fault.
     </footer>
   </main>
 
   <div id="tip" class="tip" role="tooltip" hidden></div>
 
   <script src="./vendor/uPlot.iife.min.js"></script>
-  <script src="./standalone_engine.js?v=17"></script>
-  <script src="./app.js?v=17"></script>
+  <script src="./standalone_engine.js?v=18"></script>
+  <script src="./app.js?v=18"></script>
 </body>
 </html>

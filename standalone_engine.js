@@ -1,18 +1,19 @@
-/* AirWatch Dubai — Standalone Browser Telemetry Engine (v7.1, Alphasense calibration values only)
+/* AirWatch Dubai — Standalone Browser Telemetry Engine (v7.4, Alphasense method only)
  * Runs 100% client-side on GitHub Pages (or any static host) when /api/live is absent.
  * Connects directly to:
  *   1. Firebase RTDB: https://aqms-65300-default-rtdb.firebaseio.com/data.json
  *   2. Open-Meteo Dubai (weather panel only; not used in any formula)
  *
- * Each gas value uses ONLY an Alphasense zero and sensitivity: the sensor's own factory
- * calibration sheet where we have it (H2S, NH3), otherwise Alphasense's published datasheet
- * typical values (VOC) until its factory sheet is entered:
- *   H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity   (factory sheet: ((A1 - 395) - (A2 - 362)) / 1.727952)
- *   NH3 (ppm) = (A0 - WE zero) / sensitivity                       (sheet 77840031: (mV - 328) / 58.624)
- *   VOC (ppm) = (A3 - V zero) / sensitivity                        (AAN 302-04, no temperature correction)
+ * Each gas value uses a zero and a sensitivity, by Alphasense's method only. The sensitivity
+ * is from the sensor's factory sheet (datasheet typical for VOC). The H2S and NH3 zeros are
+ * SITE ZEROS: the station's own output in clean air, from the cleanest part of the day
+ * (02:00-05:00 Dubai, five nights), as AAN 803-05 "Initial calibration" and Alphasense advise:
+ *   H2S (ppb) = ((A1 - 458) - (A2 - 359)) / 1.727952   (factory-sheet zeros 395 / 362 kept for history)
+ *   NH3 (ppm) = (A0 - 420) / 58.624                     (factory sheet 77840031 zero: 328)
+ *   VOC (ppm) = (A3 - 70) / 55                          (datasheet typical, AAN 302-04)
+ * A channel stuck at the ADC rail (>= 2550 mV or <= 5 mV) is a SENSOR_FAULT: no number.
  * No spike filter, no smoothing, no noise models, no temperature tables.
  * A negative result counts as 0, and the 10/20/30-minute averages are made from those values.
- * Datasheet-typical values are indicative: the sensor's own zero can differ from the typical one.
  * 10 / 20 / 30-minute values are plain averages; alarm levels use the 10-minute average.
  */
 (() => {
@@ -26,33 +27,38 @@
     "&past_days=2&forecast_days=1&wind_speed_unit=ms&timezone=UTC";
 
   const GASES = ["h2s", "nh3", "voc"];
-  const STATUS_CODE = { FACTORY_CAL: 3, NO_CALIBRATION: 4, DATASHEET_TYPICAL: 5 };
+  const STATUS_CODE = { FACTORY_CAL: 3, NO_CALIBRATION: 4, DATASHEET_TYPICAL: 5, SITE_ZERO: 6, SENSOR_FAULT: 7 };
+  // A channel this close to either end of the 0-2560 mV ADC range is stuck (unplugged, no power, shorted).
+  const RAIL_HIGH_MV = 2550, RAIL_LOW_MV = 5;
+  const atRail = (mv) => mv >= RAIL_HIGH_MV || mv <= RAIL_LOW_MV;
   const ALARM_CODE = { NORMAL: 0, WARNING: 1, ACTION: 2, CRITICAL: 3 };
 
-  // Calibration values, Alphasense only.
+  // Calibration values, Alphasense method only.
+  //   source "site_zero" = zero measured on this station in clean air (AAN 803-05 "Initial calibration"),
+  //                        sensitivity from the sensor's factory sheet.
   //   source "factory"   = the sensor's own Alphasense factory calibration sheet.
-  //   source "datasheet" = Alphasense's published typical values for the sensor type, used until
-  //                        the factory sheet is entered. Replace with the sheet's values when it arrives.
+  //   source "datasheet" = Alphasense's published typical values, used until the factory sheet is entered.
   const FACTORY = {
-    // H2S-B4 factory sheet: WE zero 395 mV, AE zero 362 mV, sensitivity 1.727952 mV/ppb (1727.952 mV/ppm)
-    h2s: { sensor: "H2S-B4", source: "factory", label: "Alphasense H2S-B4 factory sheet",
-           we_zero_mv: 395, ae_zero_mv: 362, sensitivity: 1.727952 },             // mV/ppb
-    nh3: { sensor: "NH3-B1+", source: "factory", serial: "77840031", label: "Alphasense factory sheet 77840031",
-           we_zero_mv: 328.0, sensitivity: 58.624 },                              // mV/ppm
+    // Site zero: median 02:00-05:00 Dubai, 29 Oct - 3 Nov 2026. Factory sheet: WE 395, AE 362 mV; 1.727952 mV/ppb
+    h2s: { sensor: "H2S-B4", source: "site_zero", label: "Site zero, H2S-B4 factory-sheet sensitivity",
+           we_zero_mv: 458, ae_zero_mv: 359, sensitivity: 1.727952 },             // mV/ppb
+    // Site zero as above. Factory sheet 77840031: zero 328 mV; 73.28 nA/ppm x 0.8 mV/nA = 58.624 mV/ppm
+    nh3: { sensor: "NH3-B1+", source: "site_zero", serial: "77840031", label: "Site zero, factory sheet 77840031 sensitivity",
+           we_zero_mv: 420, sensitivity: 58.624 },                                // mV/ppm
     // PIDX-A-040 datasheet: offset 40-100 mV (midpoint 70 mV used), typical 55 mV/ppm, output from 40 mV
     voc: { sensor: "PIDX-A-040", source: "datasheet", label: "Alphasense PIDX-A-040 datasheet typical",
            we_zero_mv: 70, sensitivity: 55, fault_below_mv: 40 },                // mV/ppm
   };
 
   const CONFIG = {
-    algo_version: "v7.3-web (H2S + NH3 factory sheets, VOC datasheet typical, negatives as 0)",
+    algo_version: "v7.4-web (H2S + NH3 site zero with factory sensitivity, VOC datasheet typical, stuck-channel fault, negatives as 0)",
     power_gap_reset_s: 15 * 60,
     calibration_note:
-      "Alphasense calibration values only. H₂S-B4 uses its factory sheet: ((A1 mV − 395) − (A2 mV − 362)) / " +
-      "1727.952 ppm (sensitivity 1.727952 mV/ppb). NH₃-B1+ uses its factory sheet 77840031: (A0 mV − 328) / " +
-      "58.624 ppm (58.624 mV/ppm = 73.28 nA/ppm × 0.8 mV/nA). PIDX-A-040 uses Alphasense datasheet typical " +
-      "values until its factory sheet is entered: (A3 − 70) / 55 ppm (offset 40–100 mV, 55 mV/ppm), indicative. " +
-      "A negative result counts as 0. No filtering, smoothing or temperature tables are applied.",
+      "Alphasense method only. H₂S-B4 and NH₃-B1+ use a site zero (the station's clean-air output, 02:00–05:00 " +
+      "Dubai, as Alphasense advise) with their factory-sheet sensitivity: H₂S ((A1 − 458) − (A2 − 359)) / 1.727952 ppb, " +
+      "NH₃ (A0 − 420) / 58.624 ppm. PIDX-A-040 uses datasheet typical values: (A3 − 70) / 55 ppm, indicative. " +
+      "A channel stuck at the ADC limit is shown as a sensor fault. A negative result counts as 0. " +
+      "No filtering, smoothing or temperature tables are applied.",
     thresholds: {
       h2s_ppm: { warning: 0.5, action: 1.5, critical: 5.0 },
       nh3_ppm: { warning: 5.0, action: 15.0, critical: 35.0 },
@@ -229,13 +235,15 @@
       }
       this.lastSampleUnix = tsUnix;
 
-      // The three Alphasense formulas. No calibration values -> no number.
+      // The three Alphasense formulas. No calibration values -> no number. Stuck channel -> no number.
       const fH = factory("h2s"), fN = factory("nh3"), fV = factory("voc");
+      const rail = { h2s: atRail(weMv) || atRail(aeMv), nh3: atRail(nh3Mv), voc: atRail(vocMv) };
       const vocFault = !!fV && vocMv < (fV.fault_below_mv ?? fV.we_zero_mv);
+      const fault = { h2s: rail.h2s, nh3: rail.nh3, voc: rail.voc || vocFault };
       const value = {
-        h2s: fH ? h2sPpb(weMv, fH.we_zero_mv, aeMv, fH.ae_zero_mv, fH.sensitivity) / 1000.0 : null,
-        nh3: fN ? nh3Ppm(nh3Mv, fN.we_zero_mv, fN.sensitivity) : null,
-        voc: fV && !vocFault ? vocPpm(vocMv, fV.we_zero_mv, fV.sensitivity) : null,
+        h2s: fH && !fault.h2s ? h2sPpb(weMv, fH.we_zero_mv, aeMv, fH.ae_zero_mv, fH.sensitivity) / 1000.0 : null,
+        nh3: fN && !fault.nh3 ? nh3Ppm(nh3Mv, fN.we_zero_mv, fN.sensitivity) : null,
+        voc: fV && !fault.voc ? vocPpm(vocMv, fV.we_zero_mv, fV.sensitivity) : null,
       };
       // A negative result counts as 0; the averages below use these floored values.
       for (const g of GASES) if (value[g] != null && value[g] < 0) value[g] = 0;
@@ -264,7 +272,8 @@
           avg_10m_ppm: round(winMean(600, g)),
           avg_20m_ppm: round(winMean(1200, g)),
           avg_30m_ppm: round(winMean(1800, g)),
-          status: !factory(g) ? "NO_CALIBRATION" : factory(g).source === "datasheet" ? "DATASHEET_TYPICAL" : "FACTORY_CAL",
+          status: !factory(g) ? "NO_CALIBRATION" : fault[g] ? "SENSOR_FAULT"
+            : { datasheet: "DATASHEET_TYPICAL", site_zero: "SITE_ZERO" }[factory(g).source] || "FACTORY_CAL",
           calibration: calibrationLabel(g),
           signal: signal[g],
         };
@@ -277,11 +286,13 @@
       const flags = (g) => {
         const f = factory(g);
         if (!f) return "NO_CALIBRATION";
-        const base = f.source === "datasheet" ? "DATASHEET_TYPICAL" : f.serial ? `FACTORY_CAL_${f.serial}` : "FACTORY_CAL";
-        return base + (g === "voc" && vocFault ? "|SENSOR_FAULT_BELOW_RANGE" : "");
+        const base = f.source === "datasheet" ? "DATASHEET_TYPICAL" : f.source === "site_zero" ? "SITE_ZERO"
+          : f.serial ? `FACTORY_CAL_${f.serial}` : "FACTORY_CAL";
+        return base + (rail[g] ? "|SENSOR_FAULT_AT_RAIL" : "") + (g === "voc" && vocFault && !rail.voc ? "|SENSOR_FAULT_BELOW_RANGE" : "");
       };
       const bySource = (src) => GASES.filter((g) => factory(g)?.source === src).map((g) => g.toUpperCase());
       const calParts = [];
+      if (bySource("site_zero").length) calParts.push(`Site zero + factory sensitivity: ${bySource("site_zero").join(", ")}`);
       if (bySource("factory").length) calParts.push(`Factory sheet: ${bySource("factory").join(", ")}`);
       if (bySource("datasheet").length) calParts.push(`Datasheet typical: ${bySource("datasheet").join(", ")}`);
 

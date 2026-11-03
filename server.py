@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AQMS Real-Time Server v6.0 -- Firebase RTDB (aqms-65300) -> algorithm engine -> dashboard.
+AQMS Real-Time Server v7.0 -- Firebase RTDB (aqms-65300) -> factory-calibration engine -> dashboard.
 
 Data flow
 ---------
@@ -8,7 +8,8 @@ Data flow
   (orderBy="$key" & startAt=<last key>) so only NEW records are downloaded.
   TLS is verified with Google Trust Services GTS Root R1 (certs/gts_root_r1.pem).
 - Matches each sample's UTC date+hour with Open-Meteo Dubai weather.
-- Runs algo_engine.AQMSAlgorithmEngine (datasheet methods + LOD/uncertainty).
+- Runs algo_engine.AQMSAlgorithmEngine: Alphasense factory calibration formulas only
+  (no filtering, smoothing or temperature tables). Weather is for display only.
 
 Dashboard API (small, gzip-compressed, poll-friendly)
 -----------------------------------------------------
@@ -61,7 +62,7 @@ DUBAI_WEATHER_URL = (
     "&wind_speed_unit=ms&timezone=UTC"
 )
 
-STATUS_CODE = {"WARMUP": 0, "BELOW_LOD": 1, "INDICATIVE": 2, "QUANTITATIVE": 3}
+STATUS_CODE = {"FACTORY_CAL": 3, "NO_CALIBRATION": 4}
 ALARM_CODE = {"NORMAL": 0, "WARNING": 1, "ACTION": 2, "CRITICAL": 3}
 GASES = ("h2s", "nh3", "voc")
 
@@ -321,7 +322,7 @@ def _compact_live(r: Dict[str, Any]) -> Dict[str, Any]:
         "ts_unix": parse_iso_unix(r["ts"]),
         "station_id": r["station_id"],
         "uptime_min": r.get("uptime_min"),
-        "calibration_verified": r.get("calibration_verified", False),
+        "calibration_label": r.get("calibration_label"),
         "gases": {
             g: {
                 **r["report"][g],
@@ -340,7 +341,6 @@ def _compact_live(r: Dict[str, Any]) -> Dict[str, Any]:
             "source": r.get("weather_source"),
         },
         "hardware": r.get("hardware", {}),
-        "dsp": {k: r["dsp"][k] for k in ("spike_rate_pct", "battery_dips_total", "spikes_rejected_total")},
     }
 
 
@@ -376,11 +376,9 @@ async def api_history(hours: float = Query(24.0, ge=0.25, le=48.0)):
             "r10": [r["report"][g].get("avg_10m_ppm", r["report"][g]["value_ppm"]) for r in rows],
             "r20": [r["report"][g].get("avg_20m_ppm", r["report"][g]["value_ppm"]) for r in rows],
             "r30": [r["report"][g].get("avg_30m_ppm", r["report"][g]["value_ppm"]) for r in rows],
-            "lod": [r["report"][g]["lod_ppm"] for r in rows],
-            "st": [STATUS_CODE.get(r["report"][g]["status"], 1) for r in rows],
+            "st": [STATUS_CODE.get(r["report"][g]["status"], 4) for r in rows],
             "al": [ALARM_CODE.get(r["alarms"][g], 0) for r in rows],
         }
-    out["nh3"]["ev"] = [1 if r["report"]["nh3"].get("event") else 0 for r in rows]
     out["temp"] = [r["raw"]["head_t_c"] for r in rows]
     out["rh"] = [r["raw"]["rh_pct"] for r in rows]
     out["batt"] = [r.get("hardware", {}).get("battery_v") for r in rows]
@@ -404,10 +402,10 @@ async def api_detail(n: int = Query(15, ge=1, le=60)):
             for r in reversed(rows)
         ],
         "calibration": {
-            g: {k: v for k, v in hub.config.get("calibration", {}).get(g, {}).items() if k != "datasheet"}
+            g: hub.config.get("calibration", {}).get(g, {})
             for g in GASES
         },
-        "calibration_note": hub.config.get("calibration", {}).get("calibration_note"),
+        "calibration_note": hub.config.get("calibration", {}).get("note"),
     }
 
 

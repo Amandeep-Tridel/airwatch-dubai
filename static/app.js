@@ -21,7 +21,7 @@
            desc: "Fuel vapour, solvents and traffic (isobutylene equivalent)." },
   };
   const ORDER = ["h2s", "nh3", "voc"];
-  const STATUS = ["WARMUP", "BELOW_LOD", "INDICATIVE", "FACTORY_CAL", "NO_CALIBRATION"];
+  const STATUS = ["WARMUP", "BELOW_LOD", "INDICATIVE", "FACTORY_CAL", "NO_CALIBRATION", "DATASHEET_TYPICAL"];
   const ALARM = ["NORMAL", "WARNING", "ACTION", "CRITICAL"];
 
   // Timeline colour classes c0..c7
@@ -430,7 +430,7 @@
         const st = STATUS[H[gas].st[i]], al = ALARM[H[gas].al[i]];
         const s = gasState(gas, { status: st, alarm: al });
         worst[b] = Math.max(worst[b], s.rank);
-        if (st === "FACTORY_CAL" && H[gas].v[i] != null) maxV[b] = Math.max(maxV[b] ?? -Infinity, H[gas].v[i]);
+        if ((st === "FACTORY_CAL" || st === "DATASHEET_TYPICAL") && H[gas].v[i] != null) maxV[b] = Math.max(maxV[b] ?? -Infinity, H[gas].v[i]);
       });
       const cells = worst.map((c, b) => {
         const t0 = start + b * BUCKET;

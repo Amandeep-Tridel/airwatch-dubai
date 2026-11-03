@@ -62,7 +62,7 @@ DUBAI_WEATHER_URL = (
     "&wind_speed_unit=ms&timezone=UTC"
 )
 
-STATUS_CODE = {"FACTORY_CAL": 3, "NO_CALIBRATION": 4}
+STATUS_CODE = {"FACTORY_CAL": 3, "NO_CALIBRATION": 4, "DATASHEET_TYPICAL": 5}
 ALARM_CODE = {"NORMAL": 0, "WARNING": 1, "ACTION": 2, "CRITICAL": 3}
 GASES = ("h2s", "nh3", "voc")
 

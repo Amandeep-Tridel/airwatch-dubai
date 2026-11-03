@@ -16,16 +16,18 @@
     "always_use_internet_weather": true
   },
   "calibration": {
-    "note": "Alphasense factory calibration only. Each gas uses only the zero and sensitivity printed on its Alphasense factory calibration sheet: H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity; NH3 (ppm) = (A0 - WE zero) / sensitivity; VOC (ppm) = (A3 - V zero) / sensitivity. No temperature tables, filtering or smoothing. A gas with any value left null shows no number until its factory sheet is entered.",
+    "note": "Alphasense calibration values only. source 'factory' = the sensor's own Alphasense factory calibration sheet; source 'datasheet' = Alphasense's published typical values for the sensor type, used until the factory sheet is entered (indicative). H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity; NH3 (ppm) = (A0 - WE zero) / sensitivity; VOC (ppm) = (A3 - V zero) / sensitivity. No temperature tables, filtering or smoothing.",
     "power_gap_reset_min": 15,
     "h2s": {
       "sensor": "H2S-B4",
+      "source": "datasheet",
       "serial": null,
-      "factory_sheet": null,
-      "we_zero_mv": null,
-      "ae_zero_mv": null,
-      "sensitivity": null,
-      "unit_of_sensitivity": "mV/ppb"
+      "factory_sheet": "Alphasense datasheet typical (ISB manual Table 2)",
+      "we_zero_mv": 350.0,
+      "ae_zero_mv": 350.0,
+      "sensitivity": 1.4,
+      "unit_of_sensitivity": "mV/ppb",
+      "sheet_values": "ISB manual Table 2, typical B4 H2S on ISB: zero offset WE/Aux 350/350 mV; 1750 nA/ppm x 0.8 mV/nA = 1400 mV/ppm = 1.4 mV/ppb. Replace with the ISB factory sheet."
     },
     "nh3": {
       "sensor": "NH3-B1+",
@@ -34,15 +36,19 @@
       "we_zero_mv": 328.0,
       "sensitivity": 58.624,
       "unit_of_sensitivity": "mV/ppm",
-      "sheet_values": "WE zero 328 mV; 73.28 nA/ppm x 0.8 mV/nA (ISB gain) = 58.624 mV/ppm"
+      "sheet_values": "WE zero 328 mV; 73.28 nA/ppm x 0.8 mV/nA (ISB gain) = 58.624 mV/ppm",
+      "source": "factory"
     },
     "voc": {
       "sensor": "PIDX-A-040",
+      "source": "datasheet",
       "serial": null,
-      "factory_sheet": null,
-      "we_zero_mv": null,
-      "sensitivity": null,
-      "unit_of_sensitivity": "mV/ppm"
+      "factory_sheet": "Alphasense PIDX-A-040 datasheet typical",
+      "we_zero_mv": 70.0,
+      "sensitivity": 55.0,
+      "fault_below_mv": 40.0,
+      "unit_of_sensitivity": "mV/ppm",
+      "sheet_values": "PIDX-A-040 datasheet: offset voltage 40-100 mV (midpoint 70 mV used); typical sensitivity 55 mV/ppm +/-10%; output signal from 0.040 V (below = fault). Replace with the PID factory sheet."
     }
   },
   "alarms": {

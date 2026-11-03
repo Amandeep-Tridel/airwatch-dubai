@@ -22,7 +22,7 @@ The station reads highest at night and lowest in office hours (a temperature eff
 
 **Sensor fault:** a channel at 2550 mV or more (the ADC tops out at 2560 mV) or at 5 mV or less is stuck (unplugged, no power or shorted). The gas then shows **Sensor fault** and no number. On 3 Nov 2026 from 06:47 to 12:41 UTC, A1 and A2 both sat at 2560 mV; because they cancel in the H2S formula, the old code showed 0 ppb and "Normal".
 
-The H2S line is Alphasense AAN 803-05 Algorithm 3 at 20 °C (k'T = 1); the NH3 line is Algorithm 4 with no AE (3-electrode sensor). The VOC line follows Alphasense AAN 302-04 (no temperature correction). 10/20/30-minute values are plain averages of the readings in each window; alarm levels use the 10-minute average.
+The H2S line is Alphasense AAN 803-05 Algorithm 3 at 20 °C (k'T = 1); the NH3 line is Algorithm 4 with no AE (3-electrode sensor). The VOC line uses the PIDX-A-040 datasheet values; its output follows the ideal gas law (about 6 % low at 40 °C), which needs the sensor temperature to correct. 10/20/30-minute values are plain averages of the readings in each window; alarm levels use the 10-minute average.
 
 To change a zero or sensitivity (a new site zero, or the VOC factory sheet), enter it (and set `source`) in **both** places:
 - `config.json` → `calibration.h2s` / `calibration.voc` (Python server mode)

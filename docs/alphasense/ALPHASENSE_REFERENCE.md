@@ -51,7 +51,7 @@ To change a sensor's values, copy them into `config.json` (`calibration.<gas>`) 
 H2S (ppb) = ((A1 − WE zero) − (A2 − AE zero)) / sensitivity        [mV, mV, mV/ppb]
 ```
 
-WE zero and AE zero are the total zero offsets on the ISB factory sheet. This is Alphasense AAN 803-05 Algorithm 3 at the factory calibration temperature, where Alphasense's temperature factor k'T is 1 (AAN 803-05, Table 3), so no temperature is needed.
+WE zero and AE zero are the total zero offsets on the ISB factory sheet. This is Alphasense AAN 803-05 Algorithm 3 at 20 °C, where its temperature factor k'T is 1 (AAN 803-05, Table 3).
 
 ---
 
@@ -100,12 +100,12 @@ The datasheet's zero uncertainty is ±10 ppm, so a rise in NH3 is reliable but a
 VOC (ppm isobutylene) = (A3 − V zero) / sensitivity        [mV, mV, mV/ppm]
 ```
 
-Alphasense AAN 302-04 says the PID needs no temperature correction. A voltage below V zero means a sensor fault, not clean air. The PID cannot see methane.
+The PIDX-A-040 datasheet (Fig. 2) says the output follows the ideal gas law: sensitivity ≈ 100 × 293.15 / (273.15 + T) % of the 20 °C value, about 6 % low at 40 °C. (AAN 302-04's "temperature correction can be ignored" is about the older PID-A1/PID-AH.) A voltage below V zero means a sensor fault, not clean air. The PID cannot see methane.
 
 ---
 
 ## 4. Still needed
 
 1. **Factory calibration sheet for the PIDX-A-040** fitted at the station (zero and sensitivity), to replace the datasheet typical values. The datasheet allows the PID offset to be 40–100 mV, so the typical value can leave a steady offset of about ±0.55 ppm in clean air.
-2. **Sensor temperature** at the top of each sensor (±1 °C), and the ISB **electronic offsets** (WEe, AEe), to switch on AAN 803-05 temperature correction. For H2S-B4, Algorithm 3's k'T is +1 at 20 °C but −1.2 at 30 °C and above.
+2. **Sensor temperature** at the top of each sensor (±1 °C), for the sensitivity correction of all three sensors (H2S-B4 Fig. 1, NH3-B1 Fig. 2, PID ideal gas law), and the ISB **electronic offsets** (WEe, AEe) and board gain for the AAN 803-05 H2S zero correction. For H2S-B4, Algorithm 3's k'T is +1 at 20 °C but −1.2 at 30 °C and above; k''T (Algorithm 4) is in nA and must be multiplied by the board gain. The code is in `gas_algo/factory_formulas.py`.
 3. **A week next to a DM reference station**, to fit an offset and a gain per gas.

@@ -12,7 +12,8 @@ published datasheet typical values ("datasheet"), which are indicative:
     VOC (ppm) = (A3 - V zero) / sensitivity
 
 Nothing else: no spike filter, no smoothing, no noise models, no temperature
-tables, no density correction, no clamping. A gas with no values in config.json gets
+tables, no density correction. A negative result counts as 0, and the 10/20/30-minute
+averages are made from those values. A gas with no values in config.json gets
 no number ("NO_CALIBRATION"); its raw voltage is still reported.
 
 The 10/20/30-minute values are plain averages of the readings in that window.
@@ -60,7 +61,7 @@ class StationState:
 
 
 class AQMSAlgorithmEngine:
-    ALGO_VERSION = "v7.1 (Alphasense factory sheet + datasheet typical)"
+    ALGO_VERSION = "v7.2 (Alphasense factory sheet + datasheet typical, negatives as 0)"
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.states: Dict[str, StationState] = {}
@@ -148,6 +149,8 @@ class AQMSAlgorithmEngine:
         fault_below = _num(self.cal.get("voc", {}).get("fault_below_mv"))
         voc_fault = bool(f) and ff.voc_sensor_fault(voc_mv, fault_below if fault_below is not None else f["we_zero_mv"])
         value["voc"] = ff.voc_ppm(voc_mv, f["we_zero_mv"], f["sensitivity"]) if f and not voc_fault else None
+        # A negative result counts as 0; the averages below use these floored values.
+        value = {g: (None if v is None else max(0.0, v)) for g, v in value.items()}
 
         # --- plain 10 / 20 / 30-minute averages --------------------------------
         st.rolling.append((ts_unix, value["h2s"], value["nh3"], value["voc"]))

@@ -21,12 +21,13 @@
            desc: "Fuel vapour, solvents and traffic (isobutylene equivalent)." },
   };
   const ORDER = ["h2s", "nh3", "voc"];
-  const STATUS = ["WARMUP", "BELOW_LOD", "INDICATIVE", "FACTORY_CAL", "NO_CALIBRATION", "DATASHEET_TYPICAL"];
+  const STATUS = ["WARMUP", "BELOW_LOD", "INDICATIVE", "FACTORY_CAL", "NO_CALIBRATION", "DATASHEET_TYPICAL", "SITE_ZERO", "SENSOR_FAULT"];
+  const CALIBRATED = ["FACTORY_CAL", "DATASHEET_TYPICAL", "SITE_ZERO"];
   const ALARM = ["NORMAL", "WARNING", "ACTION", "CRITICAL"];
 
   // Timeline colour classes c0..c7
   const TL_LEGEND = [
-    [3, "Normal"], [5, "Elevated"], [6, "High"], [7, "Very high"], [1, "No factory calibration"], [0, "No data"],
+    [3, "Normal"], [5, "Elevated"], [6, "High"], [7, "Very high"], [4, "Sensor fault"], [1, "No factory calibration"], [0, "No data"],
   ];
 
   // ------------------------------------------------------------------ state
@@ -117,6 +118,7 @@
   function gasState(gas, g) {
     if (!g) return { label: "No data", tone: "muted", rank: 0 };
     if (g.status === "NO_CALIBRATION") return { label: "No factory calibration", tone: "muted", rank: 1 };
+    if (g.status === "SENSOR_FAULT") return { label: "Sensor fault", tone: "notice", rank: 4 };
     if (g.alarm === "CRITICAL") return { label: "Very high", tone: "bad", rank: 7 };
     if (g.alarm === "ACTION") return { label: "High", tone: "high", rank: 6 };
     if (g.alarm === "WARNING") return { label: "Elevated", tone: "warn", rank: 5 };
@@ -159,7 +161,8 @@
     const states = ORDER.map((g) => ({ g, s: gasState(g, L.gases[g]) }));
     const worst = states.reduce((a, b) => (b.s.rank > a.s.rank ? b : a));
     const uncal = states.filter((x) => x.s.rank === 1).map((x) => GAS[x.g].formula);
-    const calibrated = states.filter((x) => x.s.rank >= 3).map((x) => GAS[x.g].formula);
+    const calibrated = states.filter((x) => x.s.rank === 3).map((x) => GAS[x.g].formula);
+    const faulty = states.filter((x) => x.s.rank === 4).map((x) => GAS[x.g].formula);
     const uncalText = uncal.length
       ? ` ${uncal.join(" and ")} ${uncal.length > 1 ? "have" : "has"} no Alphasense factory calibration sheet entered yet, so no value is shown.`
       : "";
@@ -172,6 +175,11 @@
       tone = worst.s.tone;
       head = `${worst.s.label} ${GAS[worst.g].name.toLowerCase()} level`;
       detail = `${GAS[worst.g].formula} is above its ${L.gases[worst.g].alarm.toLowerCase()} threshold. Check the source and ventilation.`;
+    } else if (faulty.length) {
+      tone = "notice"; head = `${faulty.join(" and ")} sensor fault`;
+      detail = `${faulty.join(" and ")} ${faulty.length > 1 ? "are" : "is"} not giving a valid signal (a channel is stuck at ` +
+        `the limit of its range), so no value is shown. Check the sensor cable and power at the station.` +
+        (calibrated.length ? ` ${calibrated.join(", ")} ${calibrated.length > 1 ? "are" : "is"} below the warning threshold.` : "");
     } else if (!calibrated.length) {
       tone = "muted"; head = "No factory calibration entered";
       detail = "Values appear once each sensor's Alphasense factory calibration sheet is entered.";
@@ -230,6 +238,11 @@
       else if (g.status === "NO_CALIBRATION") {
         valueHTML = `<span class="gc-value as-text">No factory calibration</span>`;
         sub = `Raw signal ${esc(g.signal)} · enter the Alphasense factory sheet to show ${state.unit}`;
+      } else if (g.status === "SENSOR_FAULT") {
+        valueHTML = `<span class="gc-value as-text">Sensor fault</span>`;
+        sub = String(g.flags || "").includes("AT_RAIL")
+          ? `Raw signal ${esc(g.signal)} · a channel is stuck at the limit of its range (0 or 2560 mV): check the sensor cable and power. No value is shown.`
+          : `Raw signal ${esc(g.signal)} · the PID output is below its minimum (40 mV): the sensor is faulty. No value is shown.`;
       } else {
         const badge = state.avg === "live" ? "" : `<span class="gc-mode-badge">${AVG_LABELS[state.avg]}</span>`;
         valueHTML = `<span class="gc-value">${fmtVal(gas, activePpm)}</span><span class="gc-unit">${state.unit}</span>${badge}`;
@@ -244,7 +257,7 @@
 
       const warn = th[`${gas}_ppm`]?.warning;
       const pct = warn && g ? Math.max(0, Math.min(100, (Math.max(0, activePpm ?? 0) / warn) * 100)) : 0;
-      const pctText = !g || g.status === "NO_CALIBRATION" || activePpm == null ? "—" : `${pct < 1 && pct > 0 ? "<1" : pct.toFixed(0)}%`;
+      const pctText = !g || g.status === "NO_CALIBRATION" || g.status === "SENSOR_FAULT" || activePpm == null ? "—" : `${pct < 1 && pct > 0 ? "<1" : pct.toFixed(0)}%`;
 
       card.innerHTML = `
         <div class="gc-top">
@@ -430,7 +443,7 @@
         const st = STATUS[H[gas].st[i]], al = ALARM[H[gas].al[i]];
         const s = gasState(gas, { status: st, alarm: al });
         worst[b] = Math.max(worst[b], s.rank);
-        if ((st === "FACTORY_CAL" || st === "DATASHEET_TYPICAL") && H[gas].v[i] != null) maxV[b] = Math.max(maxV[b] ?? -Infinity, H[gas].v[i]);
+        if (CALIBRATED.includes(st) && H[gas].v[i] != null) maxV[b] = Math.max(maxV[b] ?? -Infinity, H[gas].v[i]);
       });
       const cells = worst.map((c, b) => {
         const t0 = start + b * BUCKET;
@@ -453,7 +466,7 @@
   }
 
   function renderTimelineLegend() {
-    $("#timelineLegend").innerHTML = TL_LEGEND.slice(0, 6).map(([c, l]) => `<span><i class="c${c}"></i>${l}</span>`).join("");
+    $("#timelineLegend").innerHTML = TL_LEGEND.slice(0, 7).map(([c, l]) => `<span><i class="c${c}"></i>${l}</span>`).join("");
   }
 
   // ------------------------------------------------------------------ drawer

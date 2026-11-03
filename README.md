@@ -6,7 +6,7 @@ Real-time air quality dashboard for the Dubai `aqms-monitor` station (`H₂S`, `
 
 ## Alphasense calibration values only
 
-Every gas value uses **only an Alphasense zero and sensitivity**: the sensor's own factory calibration sheet where we have it, otherwise Alphasense's published **datasheet typical** values for the sensor type. No spike filter, no smoothing, no noise models, no temperature tables, no density correction, no clamping.
+Every gas value uses **only an Alphasense zero and sensitivity**: the sensor's own factory calibration sheet where we have it, otherwise Alphasense's published **datasheet typical** values for the sensor type. No spike filter, no smoothing, no noise models, no temperature tables, no density correction. **A negative result counts as 0**, and the 10/20/30-minute averages are made from those values; the raw voltages are kept unchanged.
 
 | Gas | Formula | Values used |
 | --- | --- | --- |

@@ -56,7 +56,7 @@
 
   function conv(ppm) {
     if (ppm == null || !isFinite(ppm)) return null;
-    // The factory formula's answer is shown as it is: no clamping, no smoothing.
+    // Values arrive from the engine already floored at 0 (a negative result counts as 0).
     return state.unit === "ppb" ? ppm * 1000 : ppm;
   }
   function fmtVal(gas, ppm) {

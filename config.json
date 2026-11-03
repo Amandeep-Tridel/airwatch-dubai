@@ -16,28 +16,31 @@
     "always_use_internet_weather": true
   },
   "calibration": {
-    "note": "Alphasense calibration values only. source 'factory' = the sensor's own Alphasense factory calibration sheet; source 'datasheet' = Alphasense's published typical values for the sensor type, used until the factory sheet is entered (indicative). H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity; NH3 (ppm) = (A0 - WE zero) / sensitivity; VOC (ppm) = (A3 - V zero) / sensitivity. No temperature tables, filtering or smoothing.",
+    "note": "Alphasense method only. source 'site_zero' = zero measured on this station in clean air (AAN 803-05 'Initial calibration'; Alphasense: the cleanest part of the day), sensitivity from the factory sheet; source 'factory' = the sensor's own Alphasense factory calibration sheet; source 'datasheet' = Alphasense's published typical values (indicative). H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity; NH3 (ppm) = (A0 - WE zero) / sensitivity; VOC (ppm) = (A3 - V zero) / sensitivity. A channel stuck at the ADC rail is a sensor fault. No temperature tables, filtering or smoothing.",
     "power_gap_reset_min": 15,
     "h2s": {
       "sensor": "H2S-B4",
-      "source": "factory",
+      "source": "site_zero",
       "serial": null,
-      "factory_sheet": "Alphasense H2S-B4 factory sheet",
-      "we_zero_mv": 395.0,
-      "ae_zero_mv": 362.0,
+      "factory_sheet": "Site zero, H2S-B4 factory-sheet sensitivity",
+      "we_zero_mv": 458.0,
+      "ae_zero_mv": 359.0,
       "sensitivity": 1.727952,
       "unit_of_sensitivity": "mV/ppb",
-      "sheet_values": "Factory sheet: WE (OP1) zero 395 mV, AE (OP2) zero 362 mV, sensitivity 1.727952 mV/ppb = 1727.952 mV/ppm. H2S (ppm) = ((OP1 mV - 395) - (OP2 mV - 362)) / 1727.952."
+      "sheet_values": "Site zero: median output 02:00-05:00 Dubai time on 29 and 31 Oct and 1, 2 and 3 Nov 2026 (899 readings). WE zero 458 mV, AE zero 359 mV. Factory sheet: WE (OP1) zero 395 mV, AE (OP2) zero 362 mV, sensitivity 1.727952 mV/ppb = 1727.952 mV/ppm (kept).",
+      "factory_we_zero_mv": 395.0,
+      "factory_ae_zero_mv": 362.0
     },
     "nh3": {
       "sensor": "NH3-B1+",
       "serial": "77840031",
-      "factory_sheet": "Alphasense factory sheet 77840031",
-      "we_zero_mv": 328.0,
+      "factory_sheet": "Site zero, factory sheet 77840031 sensitivity",
+      "we_zero_mv": 420.0,
       "sensitivity": 58.624,
       "unit_of_sensitivity": "mV/ppm",
-      "sheet_values": "WE zero 328 mV; 73.28 nA/ppm x 0.8 mV/nA (ISB gain) = 58.624 mV/ppm",
-      "source": "factory"
+      "sheet_values": "Site zero: median output 02:00-05:00 Dubai time on 29 and 31 Oct and 1, 2 and 3 Nov 2026 (899 readings). WE zero 420 mV. Factory sheet 77840031: WE zero 328 mV; 73.28 nA/ppm x 0.8 mV/nA (ISB gain) = 58.624 mV/ppm (kept).",
+      "source": "site_zero",
+      "factory_we_zero_mv": 328.0
     },
     "voc": {
       "sensor": "PIDX-A-040",

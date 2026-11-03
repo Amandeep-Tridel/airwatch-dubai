@@ -1,6 +1,6 @@
 # Alphasense Reference Data for the AQMS Algorithms
 
-**Method: Alphasense calibration values only.** Every gas value uses only an Alphasense zero and sensitivity: the sensor's own factory calibration sheet where available, otherwise Alphasense's published datasheet typical values. No temperature tables, no values fitted to station data, no filtering or smoothing. A negative result counts as 0, also inside the averages.
+**Method: Alphasense only.** Every gas value uses a zero and a sensitivity, by Alphasense's method: the sensitivity from the sensor's factory calibration sheet (datasheet typical for VOC); the H2S and NH3 zeros from a site zero measured on the station in clean air (AAN 803-05 "Initial calibration", and Alphasense's advice of November 2026). No temperature tables, no filtering or smoothing. A negative result counts as 0, also inside the averages.
 
 Source PDFs were downloaded from the official Alphasense/AMETEK CDN on 2026-10-29 and are stored in this folder:
 
@@ -12,13 +12,21 @@ Source PDFs were downloaded from the official Alphasense/AMETEK CDN on 2026-10-2
 
 | Sensor | Values in use | Source |
 | :--- | :--- | :--- |
-| NH3-B1+ (A0) | WE zero 328 mV; 73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm | **Factory sheet 77840031** |
-| H2S-B4 (A1/A2) | WE zero 395 mV, AE zero 362 mV; sensitivity 1.727952 mV/ppb (1727.952 mV/ppm) | **Factory sheet** |
+| NH3-B1+ (A0) | WE zero 420 mV; 73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm | **Site zero** (factory sheet 77840031 zero: 328 mV); sensitivity from the factory sheet |
+| H2S-B4 (A1/A2) | WE zero 458 mV, AE zero 359 mV; sensitivity 1.727952 mV/ppb (1727.952 mV/ppm) | **Site zero** (factory sheet zeros: 395 / 362 mV); sensitivity from the factory sheet |
 | PIDX-A-040 (A3) | V zero 70 mV (midpoint of the 40–100 mV offset range); 55 mV/ppm | **Datasheet typical**: PIDX-A-040 datasheet |
 
 The VOC datasheet-typical values are indicative until the PID's own factory sheet is entered.
 
-To switch a sensor on, copy the numbers from its factory sheet into `config.json` (`calibration.<gas>`) and into `FACTORY` at the top of `static/standalone_engine.js`.
+The H2S and NH3 zeros are **site zeros**: the station's own output in clean air, taken as the median from 02:00 to 05:00 Dubai time on five nights (29 Oct – 3 Nov 2026, 899 readings). This is AAN 803-05 "Initial calibration" and what Alphasense advised in November 2026 (take the zero from the cleanest part of the day). Alphasense measures its factory zeros in filtered, scrubbed, dry air at 20–25 °C on its own boards; on this station, with the factory zeros, clean air read about 1.4 ppm NH3 and 38 ppb H2S. The sensitivities stay from the factory sheets.
+
+The station reads highest at night and lowest in office hours (a temperature effect, not gas), so with the night-time zero, daytime values show 0. Removing that swing needs temperature correction (AAN 803-05), which needs the temperature at the top of the sensor; the station does not send it yet.
+
+**Sensor fault:** a channel at 2550 mV or more (the ADC tops out at 2560 mV) or at 5 mV or less is stuck (unplugged, no power or shorted). The gas then shows **Sensor fault** and no number. On 3 Nov 2026 from 06:47 to 12:41 UTC, A1 and A2 both sat at 2560 mV; because they cancel in the H2S formula, the old code showed 0 ppb and "Normal".
+
+To change a sensor's values, copy them into `config.json` (`calibration.<gas>`) and into `FACTORY` at the top of `static/standalone_engine.js`.
+
+**Alphasense's advice (November 2026):** AAN 803-05 is the latest note. Convert by dividing the corrected WE output by the sensitivity. For the NH3-B1 (3 electrodes) leave out everything about the AE (Algorithm 4). Temperature: use the AAN 803-05 algorithms as a baseline; Alphasense has no humidity algorithm. Zero: from the cleanest part of the day; before deployment in filtered, scrubbed, dry air. Then co-locate with a reference station and correct the remaining offset and gain. No pressure correction unless the site's pressure differs from the calibration pressure.
 
 ---
 
@@ -99,3 +107,5 @@ Alphasense AAN 302-04 says the PID needs no temperature correction. A voltage be
 ## 4. Still needed
 
 1. **Factory calibration sheet for the PIDX-A-040** fitted at the station (zero and sensitivity), to replace the datasheet typical values. The datasheet allows the PID offset to be 40–100 mV, so the typical value can leave a steady offset of about ±0.55 ppm in clean air.
+2. **Sensor temperature** at the top of each sensor (±1 °C), and the ISB **electronic offsets** (WEe, AEe), to switch on AAN 803-05 temperature correction. For H2S-B4, Algorithm 3's k'T is +1 at 20 °C but −1.2 at 30 °C and above.
+3. **A week next to a DM reference station**, to fit an offset and a gain per gas.

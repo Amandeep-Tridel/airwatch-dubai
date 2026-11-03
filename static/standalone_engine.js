@@ -10,7 +10,8 @@
  *   H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity   (AAN 803-05 Alg. 3, k'T = 1)
  *   NH3 (ppm) = (A0 - WE zero) / sensitivity                       (sheet 77840031: (mV - 328) / 58.624)
  *   VOC (ppm) = (A3 - V zero) / sensitivity                        (AAN 302-04, no temperature correction)
- * No spike filter, no smoothing, no noise models, no temperature tables, no clamping.
+ * No spike filter, no smoothing, no noise models, no temperature tables.
+ * A negative result counts as 0, and the 10/20/30-minute averages are made from those values.
  * Datasheet-typical values are indicative: the sensor's own zero can differ from the typical one.
  * 10 / 20 / 30-minute values are plain averages; alarm levels use the 10-minute average.
  */
@@ -44,7 +45,7 @@
   };
 
   const CONFIG = {
-    algo_version: "v7.1-web (Alphasense factory sheet + datasheet typical)",
+    algo_version: "v7.2-web (Alphasense factory sheet + datasheet typical, negatives as 0)",
     power_gap_reset_s: 15 * 60,
     calibration_note:
       "Alphasense calibration values only. NH₃-B1+ uses its factory sheet 77840031: (A0 mV − 328) / 58.624 ppm " +
@@ -236,6 +237,8 @@
         nh3: fN ? nh3Ppm(nh3Mv, fN.we_zero_mv, fN.sensitivity) : null,
         voc: fV && !vocFault ? vocPpm(vocMv, fV.we_zero_mv, fV.sensitivity) : null,
       };
+      // A negative result counts as 0; the averages below use these floored values.
+      for (const g of GASES) if (value[g] != null && value[g] < 0) value[g] = 0;
 
       // Plain 10 / 20 / 30-minute averages of the readings in each window.
       this.rollingBuf.push({ ts: tsUnix, ...value });

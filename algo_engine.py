@@ -61,7 +61,7 @@ class StationState:
 
 
 class AQMSAlgorithmEngine:
-    ALGO_VERSION = "v7.2 (Alphasense factory sheet + datasheet typical, negatives as 0)"
+    ALGO_VERSION = "v7.3 (H2S + NH3 factory sheets, VOC datasheet typical, negatives as 0)"
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.states: Dict[str, StationState] = {}
@@ -98,9 +98,9 @@ class AQMSAlgorithmEngine:
         if f is None:
             return "No calibration values entered"
         if gas == "h2s":
-            return f"{sheet}: ((A1 - {f['we_zero_mv']:g}) - (A2 - {f['ae_zero_mv']:g})) / {f['sensitivity']:g} ppb"
+            return f"{sheet}: ((A1 - {f['we_zero_mv']:.7g}) - (A2 - {f['ae_zero_mv']:.7g})) / {f['sensitivity']:.7g} ppb"
         ch = "A0" if gas == "nh3" else "A3"
-        return f"{sheet}: ({ch} mV - {f['we_zero_mv']:g}) / {f['sensitivity']:g}"
+        return f"{sheet}: ({ch} mV - {f['we_zero_mv']:.7g}) / {f['sensitivity']:.7g}"
 
     def _alarm(self, key: str, value: Optional[float]) -> str:
         th = self.thresholds.get(key, {})
@@ -188,7 +188,7 @@ class AQMSAlgorithmEngine:
             status = self._status(g)
             if status == "NO_CALIBRATION":
                 return "NO_CALIBRATION"
-            base = "DATASHEET_TYPICAL" if status == "DATASHEET_TYPICAL" else f"FACTORY_CAL_{self.cal[g].get('serial') or 'SHEET'}"
+            base = "DATASHEET_TYPICAL" if status == "DATASHEET_TYPICAL" else ("FACTORY_CAL_" + str(self.cal[g]["serial"]) if self.cal[g].get("serial") else "FACTORY_CAL")
             return base + ("|SENSOR_FAULT_BELOW_RANGE" if g == "voc" and voc_fault else "")
 
         battery_v = _num(parsed.get("battery_v"))

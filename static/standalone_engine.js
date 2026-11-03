@@ -5,9 +5,9 @@
  *   2. Open-Meteo Dubai (weather panel only; not used in any formula)
  *
  * Each gas value uses ONLY an Alphasense zero and sensitivity: the sensor's own factory
- * calibration sheet where we have it (NH3), otherwise Alphasense's published datasheet
- * typical values (H2S, VOC) until their factory sheets are entered:
- *   H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity   (AAN 803-05 Alg. 3, k'T = 1)
+ * calibration sheet where we have it (H2S, NH3), otherwise Alphasense's published datasheet
+ * typical values (VOC) until its factory sheet is entered:
+ *   H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity   (factory sheet: ((A1 - 395) - (A2 - 362)) / 1.727952)
  *   NH3 (ppm) = (A0 - WE zero) / sensitivity                       (sheet 77840031: (mV - 328) / 58.624)
  *   VOC (ppm) = (A3 - V zero) / sensitivity                        (AAN 302-04, no temperature correction)
  * No spike filter, no smoothing, no noise models, no temperature tables.
@@ -34,9 +34,9 @@
   //   source "datasheet" = Alphasense's published typical values for the sensor type, used until
   //                        the factory sheet is entered. Replace with the sheet's values when it arrives.
   const FACTORY = {
-    // ISB manual Table 2, typical H2S-B4 on ISB: WE/AE zero 350/350 mV; 1750 nA/ppm x 0.8 mV/nA = 1.4 mV/ppb
-    h2s: { sensor: "H2S-B4", source: "datasheet", label: "Alphasense datasheet typical (ISB manual Table 2)",
-           we_zero_mv: 350, ae_zero_mv: 350, sensitivity: 1.4 },                  // mV/ppb
+    // H2S-B4 factory sheet: WE zero 395 mV, AE zero 362 mV, sensitivity 1.727952 mV/ppb (1727.952 mV/ppm)
+    h2s: { sensor: "H2S-B4", source: "factory", label: "Alphasense H2S-B4 factory sheet",
+           we_zero_mv: 395, ae_zero_mv: 362, sensitivity: 1.727952 },             // mV/ppb
     nh3: { sensor: "NH3-B1+", source: "factory", serial: "77840031", label: "Alphasense factory sheet 77840031",
            we_zero_mv: 328.0, sensitivity: 58.624 },                              // mV/ppm
     // PIDX-A-040 datasheet: offset 40-100 mV (midpoint 70 mV used), typical 55 mV/ppm, output from 40 mV
@@ -45,14 +45,14 @@
   };
 
   const CONFIG = {
-    algo_version: "v7.2-web (Alphasense factory sheet + datasheet typical, negatives as 0)",
+    algo_version: "v7.3-web (H2S + NH3 factory sheets, VOC datasheet typical, negatives as 0)",
     power_gap_reset_s: 15 * 60,
     calibration_note:
-      "Alphasense calibration values only. NH₃-B1+ uses its factory sheet 77840031: (A0 mV − 328) / 58.624 ppm " +
-      "(58.624 mV/ppm = 73.28 nA/ppm × 0.8 mV/nA). H₂S-B4 and PIDX-A-040 use Alphasense datasheet typical " +
-      "values until their factory sheets are entered: H₂S ((A1 − 350) − (A2 − 350)) / 1.4 ppb (ISB manual " +
-      "Table 2); VOC (A3 − 70) / 55 ppm (PIDX datasheet: offset 40–100 mV, 55 mV/ppm). Datasheet values are " +
-      "indicative: each sensor's own zero can differ. No filtering, smoothing or temperature tables are applied.",
+      "Alphasense calibration values only. H₂S-B4 uses its factory sheet: ((A1 mV − 395) − (A2 mV − 362)) / " +
+      "1727.952 ppm (sensitivity 1.727952 mV/ppb). NH₃-B1+ uses its factory sheet 77840031: (A0 mV − 328) / " +
+      "58.624 ppm (58.624 mV/ppm = 73.28 nA/ppm × 0.8 mV/nA). PIDX-A-040 uses Alphasense datasheet typical " +
+      "values until its factory sheet is entered: (A3 − 70) / 55 ppm (offset 40–100 mV, 55 mV/ppm), indicative. " +
+      "A negative result counts as 0. No filtering, smoothing or temperature tables are applied.",
     thresholds: {
       h2s_ppm: { warning: 0.5, action: 1.5, critical: 5.0 },
       nh3_ppm: { warning: 5.0, action: 15.0, critical: 35.0 },
@@ -277,7 +277,7 @@
       const flags = (g) => {
         const f = factory(g);
         if (!f) return "NO_CALIBRATION";
-        const base = f.source === "datasheet" ? "DATASHEET_TYPICAL" : `FACTORY_CAL_${f.serial || "SHEET"}`;
+        const base = f.source === "datasheet" ? "DATASHEET_TYPICAL" : f.serial ? `FACTORY_CAL_${f.serial}` : "FACTORY_CAL";
         return base + (g === "voc" && vocFault ? "|SENSOR_FAULT_BELOW_RANGE" : "");
       };
       const bySource = (src) => GASES.filter((g) => factory(g)?.source === src).map((g) => g.toUpperCase());

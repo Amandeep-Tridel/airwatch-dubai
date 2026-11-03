@@ -13,10 +13,10 @@ Source PDFs were downloaded from the official Alphasense/AMETEK CDN on 2026-10-2
 | Sensor | Values in use | Source |
 | :--- | :--- | :--- |
 | NH3-B1+ (A0) | WE zero 328 mV; 73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm | **Factory sheet 77840031** |
-| H2S-B4 (A1/A2) | WE zero 350 mV, AE zero 350 mV; 1750 nA/ppm × 0.8 mV/nA = 1.4 mV/ppb | **Datasheet typical**: Alphasense ISB manual, Table 2 (typical B4 sensor on ISB) |
+| H2S-B4 (A1/A2) | WE zero 395 mV, AE zero 362 mV; sensitivity 1.727952 mV/ppb (1727.952 mV/ppm) | **Factory sheet** |
 | PIDX-A-040 (A3) | V zero 70 mV (midpoint of the 40–100 mV offset range); 55 mV/ppm | **Datasheet typical**: PIDX-A-040 datasheet |
 
-Datasheet-typical values are indicative until each sensor's own factory sheet is entered.
+The VOC datasheet-typical values are indicative until the PID's own factory sheet is entered.
 
 To switch a sensor on, copy the numbers from its factory sheet into `config.json` (`calibration.<gas>`) and into `FACTORY` at the top of `static/standalone_engine.js`.
 
@@ -98,4 +98,4 @@ Alphasense AAN 302-04 says the PID needs no temperature correction. A voltage be
 
 ## 4. Still needed
 
-1. **Factory calibration sheets for the H2S-B4 (ISB) and PIDX-A-040** fitted at the station, to replace the datasheet typical values: WE zero, AE zero and sensitivity for H2S; zero and sensitivity for the PID. The datasheet allows the H2S-B4 zero current to be −250 to +200 nA (about −143 to +114 ppb on a 0.8 mV/nA ISB) and the PID offset to be 40–100 mV, so the typical values can leave a steady offset in clean air.
+1. **Factory calibration sheet for the PIDX-A-040** fitted at the station (zero and sensitivity), to replace the datasheet typical values. The datasheet allows the PID offset to be 40–100 mV, so the typical value can leave a steady offset of about ±0.55 ppm in clean air.

@@ -20,14 +20,14 @@
     "power_gap_reset_min": 15,
     "h2s": {
       "sensor": "H2S-B4",
-      "source": "datasheet",
+      "source": "factory",
       "serial": null,
-      "factory_sheet": "Alphasense datasheet typical (ISB manual Table 2)",
-      "we_zero_mv": 350.0,
-      "ae_zero_mv": 350.0,
-      "sensitivity": 1.4,
+      "factory_sheet": "Alphasense H2S-B4 factory sheet",
+      "we_zero_mv": 395.0,
+      "ae_zero_mv": 362.0,
+      "sensitivity": 1.727952,
       "unit_of_sensitivity": "mV/ppb",
-      "sheet_values": "ISB manual Table 2, typical B4 H2S on ISB: zero offset WE/Aux 350/350 mV; 1750 nA/ppm x 0.8 mV/nA = 1400 mV/ppm = 1.4 mV/ppb. Replace with the ISB factory sheet."
+      "sheet_values": "Factory sheet: WE (OP1) zero 395 mV, AE (OP2) zero 362 mV, sensitivity 1.727952 mV/ppb = 1727.952 mV/ppm. H2S (ppm) = ((OP1 mV - 395) - (OP2 mV - 362)) / 1727.952."
     },
     "nh3": {
       "sensor": "NH3-B1+",

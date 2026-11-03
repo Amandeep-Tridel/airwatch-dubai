@@ -14,6 +14,11 @@ with the factory-sheet sensitivity), "factory" (the factory sheet) or "datasheet
 
 A channel stuck at the ADC rail (>= 2550 mV or <= 5 mV) gives SENSOR_FAULT and no number.
 
+Temperature: the station sends no sensor temperature, so the Open-Meteo hourly air temperature at
+the Tridel Dubai office (parsed["head_t_c"], when parsed["temp_from_open_meteo"] is true) stands in
+for it in the datasheet SENSITIVITY correction (ff.sensitivity_pct). The H2S zero correction (AAN
+803-05 Table 3) stays off: it needs the ISB electronic offsets.
+
 Nothing else: no spike filter, no smoothing, no noise models, no temperature
 tables, no density correction. A negative result counts as 0, and the 10/20/30-minute
 averages are made from those values. A gas with no values in config.json gets
@@ -64,7 +69,7 @@ class StationState:
 
 
 class AQMSAlgorithmEngine:
-    ALGO_VERSION = "v7.4 (H2S + NH3 site zero with factory sensitivity, VOC datasheet typical, stuck-channel fault, negatives as 0)"
+    ALGO_VERSION = "v7.5 (H2S + NH3 site zero with factory sensitivity, VOC datasheet typical, sensitivity at Open-Meteo temperature, stuck-channel fault, negatives as 0)"
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.states: Dict[str, StationState] = {}
@@ -148,15 +153,22 @@ class AQMSAlgorithmEngine:
         # --- the three Alphasense formulas; a stuck channel gives no number ----
         rail = {"h2s": ff.channel_at_rail(we_mv) or ff.channel_at_rail(ae_mv),
                 "nh3": ff.channel_at_rail(nh3_mv), "voc": ff.channel_at_rail(voc_mv)}
+        # Sensitivity at the Open-Meteo air temperature (stand-in for the sensor temperature).
+        temp_c = _num(parsed.get("head_t_c")) if parsed.get("temp_from_open_meteo") else None
+        pct = {g: 100.0 for g in GASES}
+        if temp_c is not None:
+            for g in GASES:
+                p = ff.sensitivity_pct(self.cal.get(g, {}).get("sensor", ""), temp_c)
+                pct[g] = 100.0 if p is None else p
         value: Dict[str, Optional[float]] = {}
         f = self._factory("h2s")
-        value["h2s"] = ff.h2s_ppb(we_mv, f["we_zero_mv"], ae_mv, f["ae_zero_mv"], f["sensitivity"]) / 1000.0 if f and not rail["h2s"] else None
+        value["h2s"] = ff.h2s_ppb(we_mv, f["we_zero_mv"], ae_mv, f["ae_zero_mv"], f["sensitivity"] * pct["h2s"] / 100.0) / 1000.0 if f and not rail["h2s"] else None
         f = self._factory("nh3")
-        value["nh3"] = ff.nh3_ppm(nh3_mv, f["we_zero_mv"], f["sensitivity"]) if f and not rail["nh3"] else None
+        value["nh3"] = ff.nh3_ppm(nh3_mv, f["we_zero_mv"], f["sensitivity"] * pct["nh3"] / 100.0) if f and not rail["nh3"] else None
         f = self._factory("voc")
         fault_below = _num(self.cal.get("voc", {}).get("fault_below_mv"))
         voc_fault = bool(f) and ff.voc_sensor_fault(voc_mv, fault_below if fault_below is not None else f["we_zero_mv"])
-        value["voc"] = ff.voc_ppm(voc_mv, f["we_zero_mv"], f["sensitivity"]) if f and not voc_fault and not rail["voc"] else None
+        value["voc"] = ff.voc_ppm(voc_mv, f["we_zero_mv"], f["sensitivity"] * pct["voc"] / 100.0) if f and not voc_fault and not rail["voc"] else None
         fault = {"h2s": rail["h2s"], "nh3": rail["nh3"], "voc": rail["voc"] or voc_fault}
         # A negative result counts as 0; the averages below use these floored values.
         value = {g: (None if v is None else max(0.0, v)) for g, v in value.items()}
@@ -185,7 +197,11 @@ class AQMSAlgorithmEngine:
                 "avg_20m_ppm": _round(win_mean(1200.0, i)),
                 "avg_30m_ppm": _round(win_mean(1800.0, i)),
                 "status": self._status(g, fault[g]),
-                "calibration": self.calibration_label(g),
+                "calibration": self.calibration_label(g) + (
+                    " · no temperature correction" if temp_c is None
+                    else f" · sensitivity {pct[g]:.1f} % at {temp_c:.1f} °C (Open-Meteo)"),
+                "temp_c": temp_c,
+                "sensitivity_pct": round(pct[g], 2),
                 "signal": signal[g],
             }
 
@@ -210,10 +226,12 @@ class AQMSAlgorithmEngine:
         cal_parts = ([f"Site zero + factory sensitivity: {', '.join(site_g)}"] if site_g else []) + (
             [f"Factory sheet: {', '.join(factory_g)}"] if factory_g else []) + (
             [f"Datasheet typical: {', '.join(datasheet_g)}"] if datasheet_g else [])
+        cal_parts.append("No temperature correction (Open-Meteo unavailable)" if temp_c is None
+                         else f"Sensitivity at {temp_c:.1f} °C (Open-Meteo, Tridel office)")
         return {
             "station_id": station_id,
             "algo_version": self.ALGO_VERSION,
-            "calibration_label": " · ".join(cal_parts) if cal_parts else "No calibration values",
+            "calibration_label": " · ".join(cal_parts),
             "ts": parsed["ts"],
             "uptime_min": round((ts_unix - st.power_on_unix) / 60.0, 1),
             "received_unix": time.time(),

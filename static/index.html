@@ -6,7 +6,7 @@
   <title>AirWatch Dubai — Live Air Quality</title>
   <meta name="description" content="Live hydrogen sulfide, ammonia and VOC readings from the AQMS station in Dubai." />
   <link rel="stylesheet" href="./vendor/uPlot.min.css" />
-  <link rel="stylesheet" href="./app.css?v=18" />
+  <link rel="stylesheet" href="./app.css?v=19" />
   <script>
     // Apply saved/system theme before paint to avoid a flash
     (function () {
@@ -134,7 +134,7 @@
 
     <!-- 5. Conditions & station health -->
     <section class="cond-grid" aria-label="Conditions and station health">
-      <div class="cond"><span class="k">Temperature</span><span class="v" id="cTemp">—</span><span class="s">Open-Meteo, Dubai</span></div>
+      <div class="cond"><span class="k">Temperature</span><span class="v" id="cTemp">—</span><span class="s">Open-Meteo, Tridel office</span></div>
       <div class="cond"><span class="k">Humidity</span><span class="v" id="cRh">—</span><span class="s">relative humidity</span></div>
       <div class="cond"><span class="k">Pressure</span><span class="v" id="cP">—</span><span class="s">surface</span></div>
       <div class="cond">
@@ -185,14 +185,14 @@
     </details>
 
     <footer class="foot muted small">
-      Data: AQMS station via Firebase · Weather: Open-Meteo · Values use Alphasense's method only (site zero with factory-sheet sensitivity for H₂S and NH₃; datasheet typical for VOC). A channel stuck at the limit of its range is shown as a sensor fault.
+      Data: AQMS station via Firebase · Weather: Open-Meteo · Values use Alphasense's method only (site zero with factory-sheet sensitivity for H₂S and NH₃; datasheet typical for VOC). Each sensitivity is corrected to the Open-Meteo air temperature at the Tridel Dubai office, a stand-in until the station measures its own sensor temperature. A channel stuck at the limit of its range is shown as a sensor fault.
     </footer>
   </main>
 
   <div id="tip" class="tip" role="tooltip" hidden></div>
 
   <script src="./vendor/uPlot.iife.min.js"></script>
-  <script src="./standalone_engine.js?v=18"></script>
-  <script src="./app.js?v=18"></script>
+  <script src="./standalone_engine.js?v=19"></script>
+  <script src="./app.js?v=19"></script>
 </body>
 </html>

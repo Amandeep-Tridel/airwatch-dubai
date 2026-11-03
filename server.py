@@ -7,7 +7,9 @@ Data flow
 - Polls https://aqms-65300-default-rtdb.firebaseio.com/data.json incrementally
   (orderBy="$key" & startAt=<last key>) so only NEW records are downloaded.
   TLS is verified with Google Trust Services GTS Root R1 (certs/gts_root_r1.pem).
-- Matches each sample's UTC date+hour with Open-Meteo Dubai weather.
+- Matches each sample's UTC date+hour with Open-Meteo weather at the Tridel Dubai office
+  (DAFZA Industrial Park, 25.28934 N, 55.40345 E); its air temperature stands in for the sensor
+  temperature in the sensitivity correction.
 - Runs algo_engine.AQMSAlgorithmEngine: Alphasense factory calibration formulas only
   (no filtering, smoothing or temperature tables). Weather is for display only.
 
@@ -55,7 +57,7 @@ STATIC_DIR = BASE_DIR / "static"
 
 DUBAI_WEATHER_URL = (
     "https://api.open-meteo.com/v1/forecast?"
-    "latitude=25.277&longitude=55.396"
+    "latitude=25.28934&longitude=55.40345"
     "&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m"
     "&hourly=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m"
     "&past_days=2&forecast_days=1"
@@ -111,7 +113,7 @@ def fetch_dubai_weather_sync() -> Dict[str, Any]:
         "wind_speed_ms": float(cur.get("wind_speed_10m", 1.5)),
         "wind_dir_deg": float(cur.get("wind_direction_10m", 0.0)),
         "fetched_at": cur.get("time", ""),
-        "source": "Open-Meteo (Dubai)",
+        "source": "Open-Meteo (Tridel Dubai office)",
         "by_hour": by_hour,
     }
 
@@ -152,7 +154,7 @@ class TelemetryHub:
         self.dubai_weather: Dict[str, Any] = {
             "temp_c": 27.0, "rh_pct": 70.0, "press_hpa": 1012.0,
             "wind_speed_ms": 1.5, "wind_dir_deg": 0.0,
-            "fetched_at": "", "source": "Open-Meteo (Dubai)", "by_hour": {},
+            "fetched_at": "", "source": "Open-Meteo (Tridel Dubai office)", "by_hour": {},
         }
         self.weather_task: Optional[asyncio.Task] = None
         self.firebase_task: Optional[asyncio.Task] = None
@@ -192,16 +194,20 @@ class TelemetryHub:
             row = self.dubai_weather.get("by_hour", {}).get(key)
             if row:
                 w = dict(row)
-                w["source"] = f"Open-Meteo hourly {key}:00 UTC"
+                w["source"] = f"Open-Meteo hourly {key}:00 UTC, Tridel Dubai office"
+                w["temp_from_open_meteo"] = True
                 return w
-        return self.dubai_weather
+        return {**self.dubai_weather, "temp_from_open_meteo": bool(self.dubai_weather.get("fetched_at"))}
 
     # ------------------------------------------------------------------ ingest
     async def ingest(self, raw_line: str, meta: Dict[str, Any], broadcast: bool) -> Dict[str, Any]:
+        weather = self._weather_for(raw_line)
         parsed = parse_raw_string(
             raw_line, self.config.get("string_format"),
-            live_weather=self._weather_for(raw_line), firebase_meta=meta,
+            live_weather=weather, firebase_meta=meta,
         )
+        # Only a real Open-Meteo value may correct a gas; the built-in defaults are for display only.
+        parsed["temp_from_open_meteo"] = weather.get("temp_from_open_meteo", False)
         result = self.engine.process(parsed, transport="FIREBASE")
         self.total_received += 1
         self.history.append(result)

@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-AQMS Algorithm Engine v7.1 -- Alphasense calibration values only.
+AQMS Algorithm Engine v7.4 -- Alphasense method only.
 
-Each gas value is worked out from the sensor's voltage and an Alphasense zero and
-sensitivity (gas_algo/factory_formulas.py): the sensor's own factory calibration sheet
-where we have it (calibration.<gas>.source = "factory"), otherwise Alphasense's
-published datasheet typical values ("datasheet"), which are indicative:
+Each gas value is worked out from the sensor's voltage, a zero and a sensitivity
+(gas_algo/factory_formulas.py). calibration.<gas>.source says where they come from:
+"site_zero" (zero measured on this station in clean air, AAN 803-05 "Initial calibration",
+with the factory-sheet sensitivity), "factory" (the factory sheet) or "datasheet"
+(Alphasense typical values, indicative):
 
-    H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity
-    NH3 (ppm) = (A0 - WE zero) / sensitivity          sensor 77840031: (A0 mV - 328) / 58.624
+    H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity      site zero: ((A1 - 458) - (A2 - 359)) / 1.727952
+    NH3 (ppm) = (A0 - WE zero) / sensitivity                          site zero: (A0 mV - 420) / 58.624
     VOC (ppm) = (A3 - V zero) / sensitivity
+
+A channel stuck at the ADC rail (>= 2550 mV or <= 5 mV) gives SENSOR_FAULT and no number.
 
 Nothing else: no spike filter, no smoothing, no noise models, no temperature
 tables, no density correction. A negative result counts as 0, and the 10/20/30-minute
@@ -61,7 +64,7 @@ class StationState:
 
 
 class AQMSAlgorithmEngine:
-    ALGO_VERSION = "v7.3 (H2S + NH3 factory sheets, VOC datasheet typical, negatives as 0)"
+    ALGO_VERSION = "v7.4 (H2S + NH3 site zero with factory sensitivity, VOC datasheet typical, stuck-channel fault, negatives as 0)"
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.states: Dict[str, StationState] = {}
@@ -87,10 +90,13 @@ class AQMSAlgorithmEngine:
             return None
         return {k: float(c[k]) for k in need}
 
-    def _status(self, gas: str) -> str:
+    def _status(self, gas: str, fault: bool = False) -> str:
         if not self._factory(gas):
             return "NO_CALIBRATION"
-        return "DATASHEET_TYPICAL" if self.cal.get(gas, {}).get("source") == "datasheet" else "FACTORY_CAL"
+        if fault:
+            return "SENSOR_FAULT"
+        source = self.cal.get(gas, {}).get("source")
+        return {"datasheet": "DATASHEET_TYPICAL", "site_zero": "SITE_ZERO"}.get(source, "FACTORY_CAL")
 
     def calibration_label(self, gas: str) -> str:
         f = self._factory(gas)
@@ -139,16 +145,19 @@ class AQMSAlgorithmEngine:
                 st.rolling.clear()
         st.last_sample_unix = ts_unix
 
-        # --- the three factory formulas ----------------------------------------
+        # --- the three Alphasense formulas; a stuck channel gives no number ----
+        rail = {"h2s": ff.channel_at_rail(we_mv) or ff.channel_at_rail(ae_mv),
+                "nh3": ff.channel_at_rail(nh3_mv), "voc": ff.channel_at_rail(voc_mv)}
         value: Dict[str, Optional[float]] = {}
         f = self._factory("h2s")
-        value["h2s"] = ff.h2s_ppb(we_mv, f["we_zero_mv"], ae_mv, f["ae_zero_mv"], f["sensitivity"]) / 1000.0 if f else None
+        value["h2s"] = ff.h2s_ppb(we_mv, f["we_zero_mv"], ae_mv, f["ae_zero_mv"], f["sensitivity"]) / 1000.0 if f and not rail["h2s"] else None
         f = self._factory("nh3")
-        value["nh3"] = ff.nh3_ppm(nh3_mv, f["we_zero_mv"], f["sensitivity"]) if f else None
+        value["nh3"] = ff.nh3_ppm(nh3_mv, f["we_zero_mv"], f["sensitivity"]) if f and not rail["nh3"] else None
         f = self._factory("voc")
         fault_below = _num(self.cal.get("voc", {}).get("fault_below_mv"))
         voc_fault = bool(f) and ff.voc_sensor_fault(voc_mv, fault_below if fault_below is not None else f["we_zero_mv"])
-        value["voc"] = ff.voc_ppm(voc_mv, f["we_zero_mv"], f["sensitivity"]) if f and not voc_fault else None
+        value["voc"] = ff.voc_ppm(voc_mv, f["we_zero_mv"], f["sensitivity"]) if f and not voc_fault and not rail["voc"] else None
+        fault = {"h2s": rail["h2s"], "nh3": rail["nh3"], "voc": rail["voc"] or voc_fault}
         # A negative result counts as 0; the averages below use these floored values.
         value = {g: (None if v is None else max(0.0, v)) for g, v in value.items()}
 
@@ -175,7 +184,7 @@ class AQMSAlgorithmEngine:
                 "avg_10m_ppm": _round(win_mean(600.0, i)),
                 "avg_20m_ppm": _round(win_mean(1200.0, i)),
                 "avg_30m_ppm": _round(win_mean(1800.0, i)),
-                "status": self._status(g),
+                "status": self._status(g, fault[g]),
                 "calibration": self.calibration_label(g),
                 "signal": signal[g],
             }
@@ -188,13 +197,18 @@ class AQMSAlgorithmEngine:
             status = self._status(g)
             if status == "NO_CALIBRATION":
                 return "NO_CALIBRATION"
-            base = "DATASHEET_TYPICAL" if status == "DATASHEET_TYPICAL" else ("FACTORY_CAL_" + str(self.cal[g]["serial"]) if self.cal[g].get("serial") else "FACTORY_CAL")
-            return base + ("|SENSOR_FAULT_BELOW_RANGE" if g == "voc" and voc_fault else "")
+            source = self._status(g)
+            base = source if source in ("DATASHEET_TYPICAL", "SITE_ZERO") else (
+                "FACTORY_CAL_" + str(self.cal[g]["serial"]) if self.cal[g].get("serial") else "FACTORY_CAL")
+            return (base + ("|SENSOR_FAULT_AT_RAIL" if rail[g] else "")
+                    + ("|SENSOR_FAULT_BELOW_RANGE" if g == "voc" and voc_fault and not rail["voc"] else ""))
 
         battery_v = _num(parsed.get("battery_v"))
+        site_g = [g.upper() for g in GASES if self._status(g) == "SITE_ZERO"]
         factory_g = [g.upper() for g in GASES if self._status(g) == "FACTORY_CAL"]
         datasheet_g = [g.upper() for g in GASES if self._status(g) == "DATASHEET_TYPICAL"]
-        cal_parts = ([f"Factory sheet: {', '.join(factory_g)}"] if factory_g else []) + (
+        cal_parts = ([f"Site zero + factory sensitivity: {', '.join(site_g)}"] if site_g else []) + (
+            [f"Factory sheet: {', '.join(factory_g)}"] if factory_g else []) + (
             [f"Datasheet typical: {', '.join(datasheet_g)}"] if datasheet_g else [])
         return {
             "station_id": station_id,

@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-AQMS Algorithm Engine v7.0 -- Alphasense factory calibration only.
+AQMS Algorithm Engine v7.1 -- Alphasense calibration values only.
 
-Each gas value is worked out from the sensor's voltage and the numbers printed on
-that sensor's Alphasense factory calibration sheet (gas_algo/factory_formulas.py):
+Each gas value is worked out from the sensor's voltage and an Alphasense zero and
+sensitivity (gas_algo/factory_formulas.py): the sensor's own factory calibration sheet
+where we have it (calibration.<gas>.source = "factory"), otherwise Alphasense's
+published datasheet typical values ("datasheet"), which are indicative:
 
     H2S (ppb) = ((A1 - WE zero) - (A2 - AE zero)) / sensitivity
     NH3 (ppm) = (A0 - WE zero) / sensitivity          sensor 77840031: (A0 mV - 328) / 58.624
     VOC (ppm) = (A3 - V zero) / sensitivity
 
 Nothing else: no spike filter, no smoothing, no noise models, no temperature
-tables, no density correction, no clamping. A gas whose factory sheet has not been
-entered in config.json gets no number ("NO_CALIBRATION"); its raw voltage is still
-reported.
+tables, no density correction, no clamping. A gas with no values in config.json gets
+no number ("NO_CALIBRATION"); its raw voltage is still reported.
 
 The 10/20/30-minute values are plain averages of the readings in that window.
 Alarm levels are evaluated on the 10-minute average.
@@ -59,7 +60,7 @@ class StationState:
 
 
 class AQMSAlgorithmEngine:
-    ALGO_VERSION = "v7.0 (Alphasense factory calibration only)"
+    ALGO_VERSION = "v7.1 (Alphasense factory sheet + datasheet typical)"
 
     def __init__(self, config: Dict[str, Any]) -> None:
         self.states: Dict[str, StationState] = {}
@@ -85,11 +86,16 @@ class AQMSAlgorithmEngine:
             return None
         return {k: float(c[k]) for k in need}
 
+    def _status(self, gas: str) -> str:
+        if not self._factory(gas):
+            return "NO_CALIBRATION"
+        return "DATASHEET_TYPICAL" if self.cal.get(gas, {}).get("source") == "datasheet" else "FACTORY_CAL"
+
     def calibration_label(self, gas: str) -> str:
         f = self._factory(gas)
         sheet = self.cal.get(gas, {}).get("factory_sheet") or "factory sheet"
         if f is None:
-            return "No factory calibration sheet entered"
+            return "No calibration values entered"
         if gas == "h2s":
             return f"{sheet}: ((A1 - {f['we_zero_mv']:g}) - (A2 - {f['ae_zero_mv']:g})) / {f['sensitivity']:g} ppb"
         ch = "A0" if gas == "nh3" else "A3"
@@ -139,7 +145,8 @@ class AQMSAlgorithmEngine:
         f = self._factory("nh3")
         value["nh3"] = ff.nh3_ppm(nh3_mv, f["we_zero_mv"], f["sensitivity"]) if f else None
         f = self._factory("voc")
-        voc_fault = bool(f) and ff.voc_sensor_fault(voc_mv, f["we_zero_mv"])
+        fault_below = _num(self.cal.get("voc", {}).get("fault_below_mv"))
+        voc_fault = bool(f) and ff.voc_sensor_fault(voc_mv, fault_below if fault_below is not None else f["we_zero_mv"])
         value["voc"] = ff.voc_ppm(voc_mv, f["we_zero_mv"], f["sensitivity"]) if f and not voc_fault else None
 
         # --- plain 10 / 20 / 30-minute averages --------------------------------
@@ -165,7 +172,7 @@ class AQMSAlgorithmEngine:
                 "avg_10m_ppm": _round(win_mean(600.0, i)),
                 "avg_20m_ppm": _round(win_mean(1200.0, i)),
                 "avg_30m_ppm": _round(win_mean(1800.0, i)),
-                "status": "FACTORY_CAL" if self._factory(g) else "NO_CALIBRATION",
+                "status": self._status(g),
                 "calibration": self.calibration_label(g),
                 "signal": signal[g],
             }
@@ -175,17 +182,21 @@ class AQMSAlgorithmEngine:
         alarms["overall"] = max(alarms.values(), key=lambda s: rank[s])
 
         def flags(g: str) -> str:
-            if not self._factory(g):
-                return "NO_FACTORY_CALIBRATION"
-            serial = self.cal.get(g, {}).get("serial") or "SHEET"
-            return f"FACTORY_CAL_{serial}" + ("|SENSOR_FAULT_BELOW_ZERO" if g == "voc" and voc_fault else "")
+            status = self._status(g)
+            if status == "NO_CALIBRATION":
+                return "NO_CALIBRATION"
+            base = "DATASHEET_TYPICAL" if status == "DATASHEET_TYPICAL" else f"FACTORY_CAL_{self.cal[g].get('serial') or 'SHEET'}"
+            return base + ("|SENSOR_FAULT_BELOW_RANGE" if g == "voc" and voc_fault else "")
 
         battery_v = _num(parsed.get("battery_v"))
-        calibrated = [g.upper() for g in GASES if self._factory(g)]
+        factory_g = [g.upper() for g in GASES if self._status(g) == "FACTORY_CAL"]
+        datasheet_g = [g.upper() for g in GASES if self._status(g) == "DATASHEET_TYPICAL"]
+        cal_parts = ([f"Factory sheet: {', '.join(factory_g)}"] if factory_g else []) + (
+            [f"Datasheet typical: {', '.join(datasheet_g)}"] if datasheet_g else [])
         return {
             "station_id": station_id,
             "algo_version": self.ALGO_VERSION,
-            "calibration_label": f"Factory sheet ({', '.join(calibrated)} only)" if calibrated else "No factory sheets",
+            "calibration_label": " · ".join(cal_parts) if cal_parts else "No calibration values",
             "ts": parsed["ts"],
             "uptime_min": round((ts_unix - st.power_on_unix) / 60.0, 1),
             "received_unix": time.time(),

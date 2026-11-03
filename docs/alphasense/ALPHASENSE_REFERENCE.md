@@ -1,6 +1,6 @@
 # Alphasense Reference Data for the AQMS Algorithms
 
-**Method: Alphasense factory calibration only.** Every gas value uses only the zero and sensitivity printed on that sensor's Alphasense factory calibration sheet. No temperature tables, no values fitted to station data, no filtering or smoothing, no clamping. A gas whose factory sheet has not been entered shows no value.
+**Method: Alphasense calibration values only.** Every gas value uses only an Alphasense zero and sensitivity: the sensor's own factory calibration sheet where available, otherwise Alphasense's published datasheet typical values. No temperature tables, no values fitted to station data, no filtering or smoothing, no clamping.
 
 Source PDFs were downloaded from the official Alphasense/AMETEK CDN on 2026-10-29 and are stored in this folder:
 
@@ -10,11 +10,13 @@ Source PDFs were downloaded from the official Alphasense/AMETEK CDN on 2026-10-2
 | `nh3-b1_datasheet.pdf` | NH3-B1 / NH3-B1+ Ammonia Sensor, 3-Electrode | Tech. Spec. v1.1 (FEB24) |
 | `pidx-a-040_datasheet.pdf` | PIDX-A-040 Photo Ionisation Detector | Tech. Spec. v1.1 (OCT25) |
 
-| Sensor | Factory sheet | Status |
+| Sensor | Values in use | Source |
 | :--- | :--- | :--- |
-| NH3-B1+ (A0) | 77840031: WE zero 328 mV, 73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm | **In use** |
-| H2S-B4 (A1/A2) | not entered | no value shown |
-| PIDX-A-040 (A3) | not entered | no value shown |
+| NH3-B1+ (A0) | WE zero 328 mV; 73.28 nA/ppm × 0.8 mV/nA = 58.624 mV/ppm | **Factory sheet 77840031** |
+| H2S-B4 (A1/A2) | WE zero 350 mV, AE zero 350 mV; 1750 nA/ppm × 0.8 mV/nA = 1.4 mV/ppb | **Datasheet typical**: Alphasense ISB manual, Table 2 (typical B4 sensor on ISB) |
+| PIDX-A-040 (A3) | V zero 70 mV (midpoint of the 40–100 mV offset range); 55 mV/ppm | **Datasheet typical**: PIDX-A-040 datasheet |
+
+Datasheet-typical values are indicative until each sensor's own factory sheet is entered.
 
 To switch a sensor on, copy the numbers from its factory sheet into `config.json` (`calibration.<gas>`) and into `FACTORY` at the top of `static/standalone_engine.js`.
 
@@ -96,4 +98,4 @@ Alphasense AAN 302-04 says the PID needs no temperature correction. A voltage be
 
 ## 4. Still needed
 
-1. **Factory calibration sheets for the H2S-B4 (ISB) and PIDX-A-040** fitted at the station: WE zero, AE zero and sensitivity for H2S; zero and sensitivity for the PID.
+1. **Factory calibration sheets for the H2S-B4 (ISB) and PIDX-A-040** fitted at the station, to replace the datasheet typical values: WE zero, AE zero and sensitivity for H2S; zero and sensitivity for the PID. The datasheet allows the H2S-B4 zero current to be −250 to +200 nA (about −143 to +114 ppb on a 0.8 mV/nA ISB) and the PID offset to be 40–100 mV, so the typical values can leave a steady offset in clean air.

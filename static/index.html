@@ -6,7 +6,7 @@
   <title>AirWatch Dubai — Live Air Quality</title>
   <meta name="description" content="Live hydrogen sulfide, ammonia and VOC readings from the AQMS station in Dubai." />
   <link rel="stylesheet" href="./vendor/uPlot.min.css" />
-  <link rel="stylesheet" href="./app.css?v=14" />
+  <link rel="stylesheet" href="./app.css?v=15" />
   <script>
     // Apply saved/system theme before paint to avoid a flash
     (function () {
@@ -170,10 +170,10 @@
         </div>
         <h3>How the numbers are made</h3>
         <ul class="method">
-          <li><strong>Factory calibration only.</strong> Each gas uses only the zero and sensitivity printed on its Alphasense factory calibration sheet. No filtering, smoothing, temperature tables or clamping.</li>
+          <li><strong>Alphasense calibration values only.</strong> Each gas uses an Alphasense zero and sensitivity: the sensor's own factory sheet where available, otherwise Alphasense's datasheet typical values. No filtering, smoothing, temperature tables or clamping.</li>
           <li><strong>NH₃</strong> (Alphasense NH₃-B1+, factory sheet <code>77840031</code>, A0): <code>(A0 mV − 328) / 58.624</code> ppm (<code>58.624 mV/ppm = 73.28 nA/ppm × 0.8 mV/nA</code>).</li>
-          <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary): <code>((A1 − WE zero) − (A2 − AE zero)) / sensitivity</code> ppb — no value until its factory sheet is entered.</li>
-          <li><strong>VOC</strong> (Alphasense PIDX-A-040, A3): <code>(A3 − V zero) / sensitivity</code> ppm isobutylene — no value until its factory sheet is entered.</li>
+          <li><strong>H₂S</strong> (Alphasense H2S-B4, A1 working / A2 auxiliary): <code>((A1 − 350) − (A2 − 350)) / 1.4</code> ppb — Alphasense datasheet typical (ISB manual Table 2: zero 350/350 mV, 1750 nA/ppm × 0.8 mV/nA). Indicative until its factory sheet is entered.</li>
+          <li><strong>VOC</strong> (Alphasense PIDX-A-040, A3): <code>(A3 − 70) / 55</code> ppm isobutylene — Alphasense datasheet typical (offset 40–100 mV, midpoint used; 55 mV/ppm). Indicative until its factory sheet is entered.</li>
           <li>10 / 20 / 30-minute values are plain averages of the readings in each window. Alarm levels use the 10-minute average. Weather is shown for information only.</li>
         </ul>
         <p class="muted small" id="calNote"></p>
@@ -185,14 +185,14 @@
     </details>
 
     <footer class="foot muted small">
-      Data: AQMS station via Firebase · Weather: Open-Meteo · Values use Alphasense factory calibration sheets only.
+      Data: AQMS station via Firebase · Weather: Open-Meteo · Values use Alphasense calibration values only (factory sheet for NH₃; datasheet typical for H₂S and VOC).
     </footer>
   </main>
 
   <div id="tip" class="tip" role="tooltip" hidden></div>
 
   <script src="./vendor/uPlot.iife.min.js"></script>
-  <script src="./standalone_engine.js?v=14"></script>
-  <script src="./app.js?v=14"></script>
+  <script src="./standalone_engine.js?v=15"></script>
+  <script src="./app.js?v=15"></script>
 </body>
 </html>
